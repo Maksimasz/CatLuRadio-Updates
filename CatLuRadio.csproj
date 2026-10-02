@@ -5,7 +5,6 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
-    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>icon.ico</ApplicationIcon>
@@ -39,6 +38,18 @@
     <PackageReference Include="LibVLCSharp" Version="3.10.1" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.24" />
   </ItemGroup>
+
+  <!-- Пакет WebView2 безусловно подключает и свою WPF-сборку
+       (build/Common.targets:131), хотя проект чисто WinForms. Она нигде не
+       используется, но её WindowsBase конфликтует с WindowsBase из референсной
+       сборки net8.0 — 22 строки предупреждения MSB3277 при каждой сборке.
+       Статически ссылку не убрать: пакет подключает её после тела .csproj,
+       поэтому убираем на этапе выполнения, до разрешения ссылок. -->
+  <Target Name="ExcludeUnusedWebView2Wpf" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <Content Include="wwwroot\**\*">
