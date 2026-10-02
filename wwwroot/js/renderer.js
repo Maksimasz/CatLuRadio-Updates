@@ -2974,23 +2974,35 @@ function applyTranslations() {
 
 // Настройка IPC слушателей
 function setupIPCListeners() {
-  window.AppAPI.onTogglePlay(() => {
+  // Мост с хостом устроен как «запрос/ответ» (у каждого вызова есть
+  // callbackId): событий от C# в страницу не приходит, поэтому on* у AppAPI
+  // может и не оказаться. Раньше эти вызовы падали с TypeError и обрывали
+  // init() дальше — вместе с ними не работали переводы, проверка обновлений,
+  // автозапуск последней станции и периодическая проверка станций.
+  const register = (name, handler) => {
+    if (typeof window.AppAPI?.[name] === 'function') {
+      window.AppAPI[name](handler);
+    }
+  };
+
+  register('onTogglePlay', () => {
     togglePlay();
   });
   
-  window.AppAPI.onStopPlay(() => {
+  register('onStopPlay', () => {
     stopPlay();
   });
   
-  window.AppAPI.onStopAllAudio(() => {
+  register('onStopAllAudio', () => {
     stopAllAudio();
   });
   
-  window.AppAPI.onShowAbout(() => {
+  register('onShowAbout', () => {
     alert('CatLu Radio v3.1.7\n\nПриложение для прослушивания интернет-радио.');
   });
   
-  // Очистка при закрытии окна
+  // При выгрузке страницы помечаем закрытие: stopPlay() в этом случае не
+  // стирает последнюю станцию — она нужна для автозапуска при следующем запуске.
   window.addEventListener('beforeunload', () => {
     state.isClosing = true;
     stopAllAudio();
