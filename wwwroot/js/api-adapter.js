@@ -6,11 +6,40 @@ console.log('[WebView2 API] window.chrome.webview:', !!window.chrome?.webview);
 let callbackId = 0;
 const callbacks = {};
 
-function sendToNative(action, data = {}) {
+// Промис, который никогда не завершается, вешал инициализацию приложения навсегда:
+// если C#-сторона не отвечала (неизвестное действие, исключение внутри обработчика,
+// сбой WebView2), страница оставалась пустой без единой ошибки в консоли.
+// Теперь по таймауту резолвим null (вызывающий код это уже умеет обрабатывать
+// через defaultValue/опциональную цепочку) и пишем в консоль.
+const DEFAULT_TIMEOUT_MS = 20000;
+
+const ACTION_TIMEOUT_MS = {
+    // Диалоги выбора файла могут ждать решений пользователя долго, но не вечно:
+    // C# отвечает всегда — и при OK, и при отмене.
+    showOpenDialog: 10 * 60 * 1000,
+    showSaveDialog: 10 * 60 * 1000,
+    // Установщик качается целиком, на медленной линии это минуты.
+    installUpdate: 30 * 60 * 1000
+};
+
+function sendToNative(action, data = {}, timeoutMs = null) {
+    const limit = timeoutMs ?? ACTION_TIMEOUT_MS[action] ?? DEFAULT_TIMEOUT_MS;
     return new Promise((resolve) => {
         const id = ++callbackId;
-        callbacks[id] = resolve;
-        
+
+        const timeoutId = setTimeout(() => {
+            if (!(id in callbacks)) return;
+            delete callbacks[id];
+            console.error(`[WebView2 API] Таймаут ${limit} мс, нет ответа на действие "${action}"`);
+            resolve(null);
+        }, limit);
+
+        callbacks[id] = (result) => {
+            clearTimeout(timeoutId);
+            delete callbacks[id];
+            resolve(result);
+        };
+
         if (window.chrome && window.chrome.webview) {
             window.chrome.webview.postMessage(JSON.stringify({
                 action,
@@ -19,6 +48,8 @@ function sendToNative(action, data = {}) {
             }));
         } else {
             console.error('[WebView2 API] window.chrome.webview не доступен!');
+            clearTimeout(timeoutId);
+            delete callbacks[id];
             resolve(null);
         }
     });
@@ -60,8 +91,10 @@ const WebView2API = {
 
     async set(key, value) {
         try {
-            await sendToNative('setStore', { key, value });
-            return true;
+            const result = await sendToNative('setStore', { key, value });
+            // Раньше здесь безусловно возвращался true: при таймауте или ошибке
+            // страница считала настройки сохранёнными, хотя этого не произошло.
+            return result?.success === true;
         } catch (e) {
             console.error('[WebView2 API] Ошибка записи:', e);
             return false;
