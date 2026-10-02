@@ -1,0 +1,24 @@
+# --- Артефакты сборки .NET ---
+[Bb]in/
+[Oo]bj/
+
+# --- Релизы и установщик ---
+release/
+installer/downloads/
+installer/dependencies/
+
+# --- Сторонние бинарники, не наш код ---
+# WebView2 Fixed Version Runtime (668 МБ) — скачивается отдельно,
+# см. installer/downloads/*.cab. Не коммитим: это дистрибутив Microsoft.
+WebView2Runtime/
+
+# --- Среда разработки ---
+.vs/
+*.user
+*.suo
+*.DotSettings.user
+
+# --- Локальное ---
+*.log
+Thumbs.db
+Desktop.ini

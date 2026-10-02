@@ -1,0 +1,20 @@
+# В проекте тесты tests/*.js ищут в исходниках точные строки с '\n',
+# поэтому исходники обязаны везде лежать с LF — иначе проверки падают
+# при любом переключении/пересборке.
+* text=auto eol=lf
+
+# Двоичные файлы — без какой-либо конвертации.
+*.png  binary
+*.ico  binary
+*.gif  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.ttf  binary
+*.woff binary
+*.woff2 binary
+*.exe  binary
+*.dll  binary
+*.cab  binary
+*.pdb  binary
+*.zip  binary

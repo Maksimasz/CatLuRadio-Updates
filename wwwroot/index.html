@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CatLu Radio</title>
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    console.log('=== HTML ЗАГРУЖЕН ===');
+    console.log('Время:', new Date().toLocaleTimeString());
+  </script>
+  <!-- WebView2 API -->
+  <script src="js/api-adapter.js?v=3.1.7"></script>
+  <!-- HLS.js для поддержки HLS потоков (m3u8) -->
+  <script src="js/hls.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <h1>📻 CatLu Radio</h1>
+        <div id="clock" class="clock" style="font-size: 14px; font-weight: 500; opacity: 0.9;"></div>
+      </div>
+      <div class="controls">
+        <button id="minimizePlayerBtn" class="btn btn-icon" title="Мини-плеер">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+          </svg>
+        </button>
+        <button id="playPauseBtn" class="btn btn-primary" title="Воспроизвести/Пауза">
+          <svg id="playIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block;">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <svg id="pauseIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+          </svg>
+        </button>
+        <button id="stopBtn" class="btn btn-secondary" title="Остановить">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="6" width="12" height="12" rx="1"/>
+          </svg>
+        </button>
+        <div class="volume-control">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <input type="range" id="volumeSlider" min="0" max="100" value="50">
+          <span id="volumeValue">50%</span>
+        </div>
+        <button id="exitBtn" class="btn btn-exit" title="Выход из приложения">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="stations">Станции</button>
+      <button class="tab-btn" data-tab="search">Поиск</button>
+      <button class="tab-btn" data-tab="favorites">Избранное</button>
+      <button class="tab-btn" data-tab="history">История</button>
+      <button class="tab-btn" data-tab="equalizer">Эквалайзер</button>
+      <button class="tab-btn" data-tab="settings">Настройки</button>
+    </div>
+
+    <div class="tab-content active" id="stations-tab">
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Поиск станций...">
+        <select id="filterSelect">
+          <option value="all">Все страны</option>
+          <optgroup label="СНГ">
+            <option value="RU">Россия</option><option value="AM">Армения</option><option value="AZ">Азербайджан</option><option value="BY">Беларусь</option><option value="KZ">Казахстан</option><option value="KG">Кыргызстан</option><option value="MD">Молдова</option><option value="TJ">Таджикистан</option><option value="TM">Туркменистан</option><option value="UZ">Узбекистан</option>
+          </optgroup>
+          <optgroup label="Европа">
+            <option value="AL">Албания</option><option value="AT">Австрия</option><option value="BE">Бельгия</option><option value="BG">Болгария</option><option value="BA">Босния и Герцеговина</option><option value="GB">Великобритания</option><option value="HU">Венгрия</option><option value="DE">Германия</option><option value="GR">Греция</option><option value="DK">Дания</option><option value="IE">Ирландия</option><option value="IS">Исландия</option><option value="ES">Испания</option><option value="IT">Италия</option><option value="CY">Кипр</option><option value="LV">Латвия</option><option value="LT">Литва</option><option value="LU">Люксембург</option><option value="MT">Мальта</option><option value="NL">Нидерланды</option><option value="NO">Норвегия</option><option value="PL">Польша</option><option value="PT">Португалия</option><option value="RO">Румыния</option><option value="RS">Сербия</option><option value="SK">Словакия</option><option value="SI">Словения</option><option value="FI">Финляндия</option><option value="FR">Франция</option><option value="HR">Хорватия</option><option value="ME">Черногория</option><option value="CZ">Чехия</option><option value="CH">Швейцария</option><option value="SE">Швеция</option><option value="EE">Эстония</option><option value="UA">Украина</option><option value="GE">Грузия</option><option value="TR">Турция</option>
+          </optgroup>
+          <option value="US">США</option>
+          <option value="IL">Израиль</option>
+        </select>
+        <select id="sortSelect">
+          <option value="name">По алфавиту</option>
+          <option value="genre">По жанру</option>
+          <option value="country">По стране</option>
+        </select>
+      </div>
+      <div id="stationsList" class="stations-list"></div>
+    </div>
+
+    <div class="tab-content" id="search-tab">
+      <div class="search-box">
+        <select id="onlinePortalSelect" aria-label="Портал">
+          <option value="all">Все порталы</option>
+          <option value="radio-browser">Radio Browser</option>
+          <option value="radiopotok">RadioPotok</option>
+          <option value="101ru">101.ru</option>
+          <option value="dfm">DFM</option>
+          <option value="maximum">Maximum</option>
+          <option value="rlive">RLive</option>
+          <option value="radijo-stotys">Radijo-stotys.lt</option>
+        </select>
+        <input type="text" id="onlineSearchInput" placeholder="Название, стиль, исполнитель или годы">
+        <select id="onlineCountrySelect">
+          <option value="all">Все страны</option>
+          <optgroup label="СНГ">
+            <option value="RU">Россия</option><option value="AM">Армения</option><option value="AZ">Азербайджан</option><option value="BY">Беларусь</option><option value="KZ">Казахстан</option><option value="KG">Кыргызстан</option><option value="MD">Молдова</option><option value="TJ">Таджикистан</option><option value="TM">Туркменистан</option><option value="UZ">Узбекистан</option>
+          </optgroup>
+          <optgroup label="Европа">
+            <option value="AL">Албания</option><option value="AT">Австрия</option><option value="BE">Бельгия</option><option value="BG">Болгария</option><option value="BA">Босния и Герцеговина</option><option value="GB">Великобритания</option><option value="HU">Венгрия</option><option value="DE">Германия</option><option value="GR">Греция</option><option value="DK">Дания</option><option value="IE">Ирландия</option><option value="IS">Исландия</option><option value="ES">Испания</option><option value="IT">Италия</option><option value="CY">Кипр</option><option value="LV">Латвия</option><option value="LT">Литва</option><option value="LU">Люксембург</option><option value="MT">Мальта</option><option value="NL">Нидерланды</option><option value="NO">Норвегия</option><option value="PL">Польша</option><option value="PT">Португалия</option><option value="RO">Румыния</option><option value="RS">Сербия</option><option value="SK">Словакия</option><option value="SI">Словения</option><option value="FI">Финляндия</option><option value="FR">Франция</option><option value="HR">Хорватия</option><option value="ME">Черногория</option><option value="CZ">Чехия</option><option value="CH">Швейцария</option><option value="SE">Швеция</option><option value="EE">Эстония</option><option value="UA">Украина</option><option value="GE">Грузия</option><option value="TR">Турция</option>
+          </optgroup>
+          <option value="US">США</option>
+          <option value="IL">Израиль</option>
+        </select>
+      </div>
+      <div class="online-search-action">
+        <button id="onlineSearchBtn" class="btn btn-primary">🌐 Найти в интернете</button>
+        <button id="clearOnlineSearchBtn" class="btn btn-secondary">× Очистить</button>
+        <button id="backToStationsBtn" class="btn btn-secondary">← К станциям</button>
+      </div>
+      <div id="onlineResults" class="online-results" hidden></div>
+    </div>
+
+    <div class="tab-content" id="favorites-tab">
+      <div id="favoritesList" class="stations-list"></div>
+      <p class="empty-message" id="favoritesEmpty" style="display: none;">
+        Нет избранных станций. Добавьте станции в избранное из списка станций.
+      </p>
+    </div>
+
+    <div class="tab-content" id="history-tab">
+      <div class="history-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3>История прослушанных станций</h3>
+        <button id="clearHistoryBtn" class="btn btn-secondary">Очистить историю</button>
+      </div>
+      <div id="historyList" class="stations-list"></div>
+      <p class="empty-message" id="historyEmpty" style="display: none;">
+        История пуста. Начните прослушивать станции, и они появятся здесь.
+      </p>
+    </div>
+
+    <div class="tab-content" id="equalizer-tab">
+      <div class="equalizer-container">
+        <div class="equalizer-header">
+          <h3>Эквалайзер</h3>
+          <div class="equalizer-presets">
+            <label for="eqPresetSelect">Предустановка:</label>
+            <select id="eqPresetSelect">
+              <option value="normal">Обычный</option>
+              <option value="pop">Поп</option>
+              <option value="rock">Рок</option>
+              <option value="jazz">Джаз</option>
+              <option value="classic">Классика</option>
+              <option value="bass">Басы</option>
+              <option value="treble">Высокие</option>
+              <option value="vocal">Вокал</option>
+            </select>
+            <button id="eqResetBtn" class="btn btn-secondary">Сброс</button>
+          </div>
+        </div>
+        <div class="equalizer-bands" id="equalizerBands">
+          <!-- Полосы эквалайзера будут добавлены динамически -->
+        </div>
+        <div class="equalizer-info" id="equalizerInfo">
+          <p>Перетащите ползунки для настройки частот. Изменения применяются автоматически.</p>
+        </div>
+        <div id="equalizerDebug" style="display: none; padding: 12px; margin-top: 16px; background: rgba(255, 0, 0, 0.1); border: 1px solid rgba(255, 0, 0, 0.3); border-radius: 4px; color: red; font-size: 12px;"></div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="settings-tab">
+      <div class="settings-form">
+        <h2>Настройки</h2>
+        
+        <!-- Основные настройки -->
+        <div class="settings-accordion">
+          <div class="accordion-header" onclick="toggleAccordion('basic-settings')">
+            <h3>⚙️ Основные настройки</h3>
+            <span class="accordion-arrow">▼</span>
+          </div>
+          <div class="accordion-content" id="basic-settings">
+            <div class="form-group">
+              <label for="languageSelect">Язык интерфейса:</label>
+              <select id="languageSelect">
+                <option value="ru">Русский</option>
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="themeSelect">Тема оформления:</label>
+              <select id="themeSelect">
+                <option value="light">Светлая</option>
+                <option value="dark">Темная</option>
+                <option value="system">Системная</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="minimizeToTray">
+                Сворачивать в трей при закрытии окна
+              </label>
+            </div>
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="startMinimized">
+                Запускать свернутым
+              </label>
+            </div>
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="editMode">
+                Режим редактирования (позволяет редактировать все станции, включая предустановленные)
+              </label>
+            </div>
+            <button id="saveSettingsBtn" class="btn btn-primary">Сохранить настройки</button>
+            <div id="settingsMessage" class="message"></div>
+          </div>
+        </div>
+        
+        <!-- Управление станциями -->
+        <div class="settings-accordion">
+          <div class="accordion-header" onclick="toggleAccordion('stations-management')">
+            <h3>📻 Управление станциями</h3>
+            <span class="accordion-arrow">▼</span>
+          </div>
+          <div class="accordion-content" id="stations-management">
+            <div class="settings-section">
+              <h3>Добавить станцию</h3>
+          <div class="add-station-form" id="addStationForm">
+            <div class="form-group">
+              <label for="stationName">Название станции:</label>
+              <input type="text" id="stationName" placeholder="Например: Моя Радиостанция">
+            </div>
+            <div class="form-group">
+              <label for="stationUrl">URL потока:</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="stationUrl" placeholder="https://example.com/stream.mp3 или TuneIn URL или RadioPotok скрипт" style="flex: 1;">
+                <button id="extractTuneInBtn" class="btn btn-secondary" title="Извлечь поток из TuneIn">🔗 TuneIn</button>
+                <button id="extractRadioPotokBtn" class="btn btn-secondary" title="Извлечь поток из RadioPotok (введите ссылку на скрипт: https://radiopotok.ru/f/script6.1/4.js)">📻 RadioPotok</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="stationCountry">Страна:</label>
+              <select id="stationCountry">
+                <optgroup label="СНГ">
+                  <option value="RU">Россия</option><option value="AM">Армения</option><option value="AZ">Азербайджан</option><option value="BY">Беларусь</option><option value="KZ">Казахстан</option><option value="KG">Кыргызстан</option><option value="MD">Молдова</option><option value="TJ">Таджикистан</option><option value="TM">Туркменистан</option><option value="UZ">Узбекистан</option>
+                </optgroup>
+                <optgroup label="Европа">
+                  <option value="AL">Албания</option><option value="AT">Австрия</option><option value="BE">Бельгия</option><option value="BG">Болгария</option><option value="BA">Босния и Герцеговина</option><option value="GB">Великобритания</option><option value="HU">Венгрия</option><option value="DE">Германия</option><option value="GR">Греция</option><option value="DK">Дания</option><option value="IE">Ирландия</option><option value="IS">Исландия</option><option value="ES">Испания</option><option value="IT">Италия</option><option value="CY">Кипр</option><option value="LV">Латвия</option><option value="LT">Литва</option><option value="LU">Люксембург</option><option value="MT">Мальта</option><option value="NL">Нидерланды</option><option value="NO">Норвегия</option><option value="PL">Польша</option><option value="PT">Португалия</option><option value="RO">Румыния</option><option value="RS">Сербия</option><option value="SK">Словакия</option><option value="SI">Словения</option><option value="FI">Финляндия</option><option value="FR">Франция</option><option value="HR">Хорватия</option><option value="ME">Черногория</option><option value="CZ">Чехия</option><option value="CH">Швейцария</option><option value="SE">Швеция</option><option value="EE">Эстония</option><option value="UA">Украина</option><option value="GE">Грузия</option><option value="TR">Турция</option>
+                </optgroup>
+                <option value="US">США</option>
+                <option value="IL">Израиль</option>
+                <option value="OTHER">Другая</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="stationGenre">Жанр:</label>
+              <select id="stationGenre">
+                <option value="Pop">Pop</option>
+                <option value="Rock">Rock</option>
+                <option value="Jazz">Jazz</option>
+                <option value="Classical">Classical</option>
+                <option value="Dance">Dance</option>
+                <option value="Electronic">Electronic</option>
+                <option value="Hip-Hop">Hip-Hop</option>
+                <option value="Country">Country</option>
+                <option value="Blues">Blues</option>
+                <option value="Reggae">Reggae</option>
+                <option value="Metal">Metal</option>
+                <option value="Folk">Folk</option>
+                <option value="R&B">R&B</option>
+                <option value="Latin">Latin</option>
+                <option value="World">World</option>
+                <option value="News">News</option>
+                <option value="Talk">Talk</option>
+                <option value="Sports">Sports</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="stationDescription">Описание (необязательно):</label>
+              <textarea id="stationDescription" rows="3" placeholder="Краткое описание станции"></textarea>
+            </div>
+            <div class="form-buttons">
+              <button id="addStationBtn" class="btn btn-primary">Добавить станцию</button>
+              <button id="updateStationBtn" class="btn btn-primary" style="display: none;">💾 Сохранить изменения</button>
+              <button id="cancelEditBtn" class="btn btn-secondary" style="display: none;">❌ Отмена</button>
+            </div>
+            <input type="hidden" id="editingStationId" value="">
+            <div id="addStationMessage" class="message"></div>
+          </div>
+        </div>
+        
+            <div class="settings-section" style="margin-top: 20px;">
+              <h3>Импорт/Экспорт станций</h3>
+              <p class="settings-description">Экспортируйте все ваши станции в JSON файл или импортируйте станции из файла расширения браузера.</p>
+              <div class="import-export-buttons">
+                <button id="exportBtn" class="btn btn-secondary">📥 Экспорт станций</button>
+                <button id="importBtn" class="btn btn-secondary">📤 Импорт станций</button>
+                <button id="loadDefaultStationsBtn" class="btn btn-secondary">🔄 Загрузить предустановленные станции</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Автоматизация -->
+        <div class="settings-accordion">
+          <div class="accordion-header" onclick="toggleAccordion('automation')">
+            <h3>⏰ Автоматизация</h3>
+            <span class="accordion-arrow">▼</span>
+          </div>
+          <div class="accordion-content" id="automation">
+            <div class="settings-section">
+              <h3>Таймер сна</h3>
+              <p class="settings-description">Автоматически остановить воспроизведение через указанное время.</p>
+              <div class="form-group">
+                <label>
+                  <input type="checkbox" id="sleepTimerEnabled"> Включить таймер сна
+                </label>
+              </div>
+              <div class="form-group" id="sleepTimerControls" style="display: none; margin-top: 10px;">
+                <label for="sleepTimerDuration">Время до остановки (минуты):</label>
+                <input type="number" id="sleepTimerDuration" min="1" max="480" value="60" style="width: 100px; margin: 0 10px;">
+                <button id="startSleepTimerBtn" class="btn btn-primary">Запустить таймер</button>
+                <button id="stopSleepTimerBtn" class="btn btn-secondary" style="display: none;">Остановить таймер</button>
+                <div id="sleepTimerStatus" class="message" style="margin-top: 10px; display: none;"></div>
+              </div>
+            </div>
+            
+            <div class="settings-section" style="margin-top: 20px;">
+              <h3>Планировщик</h3>
+              <p class="settings-description">Запланировать автоматическое включение станций по расписанию.</p>
+              <div class="form-group">
+                <label>
+                  <input type="checkbox" id="schedulerEnabled"> Включить планировщик
+                </label>
+              </div>
+              <div id="schedulerControls" style="display: none; margin-top: 15px;">
+                <div id="schedulesList" style="margin-bottom: 15px;"></div>
+                <button id="addScheduleBtn" class="btn btn-primary">➕ Добавить расписание</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Система -->
+        <div class="settings-accordion">
+          <div class="accordion-header" onclick="toggleAccordion('system')">
+            <h3>🔧 Система</h3>
+            <span class="accordion-arrow">▼</span>
+          </div>
+          <div class="accordion-content" id="system">
+            <div class="settings-section">
+              <h3>CatLu Radio</h3>
+              <p class="settings-description">Плеер интернет-радио с поиском, избранным, историей и эквалайзером.</p>
+              <a class="btn btn-secondary" href="https://github.com/Maksimasz/CatLuRadio-Updates" target="_blank" rel="noopener">GitHub и обновления</a>
+            </div>
+            <div class="settings-section" style="margin-top: 20px;">
+              <h3>Обновления</h3>
+              <p id="updateStatus" class="settings-description">Проверка обновлений при запуске.</p>
+              <button id="checkUpdateBtn" class="btn btn-secondary">Проверить обновления</button>
+              <button id="installUpdateBtn" class="btn btn-primary" style="display: none;"></button>
+            </div>
+            <div class="settings-section" style="margin-top: 20px;">
+              <h3>Выход из приложения</h3>
+              <p class="settings-description">Закрыть приложение и выйти.</p>
+              <button id="exitAppBtn" class="btn btn-exit">🚪 Выход из приложения</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Модальное окно для добавления/редактирования расписания -->
+    <div id="scheduleModal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="scheduleModalTitle">Добавить расписание</h3>
+          <button class="modal-close" onclick="closeScheduleModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="scheduleStationSelect">Станция:</label>
+            <select id="scheduleStationSelect" style="width: 100%;">
+              <option value="">Выберите станцию...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="scheduleTime">Время включения (HH:MM):</label>
+            <input type="time" id="scheduleTime" style="width: 100%;" required>
+          </div>
+          <div class="form-group">
+            <label>Дни недели:</label>
+            <div class="days-checkboxes" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px;">
+              <label style="display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" class="day-checkbox" value="0"> Вс
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" class="day-checkbox" value="1"> Пн
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" class="day-checkbox" value="2"> Вт
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" class="day-checkbox" value="3"> Ср
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" class="day-checkbox" value="4"> Чт
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" class="day-checkbox" value="5"> Пт
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" class="day-checkbox" value="6"> Сб
+              </label>
+            </div>
+            <p style="font-size: 0.85em; color: var(--md-on-surface-variant); margin-top: 8px;">
+              Если не выбрано ни одного дня, расписание будет работать каждый день
+            </p>
+          </div>
+          <div id="scheduleModalMessage" class="message" style="display: none;"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="saveScheduleBtn" class="btn btn-primary">Сохранить</button>
+          <button onclick="closeScheduleModal()" class="btn btn-secondary">Отмена</button>
+        </div>
+        <input type="hidden" id="editingScheduleIndex" value="">
+      </div>
+    </div>
+
+    <div class="now-playing" id="nowPlaying">
+      <div class="now-playing-info">
+        <span class="now-playing-label">Сейчас играет:</span>
+        <div class="now-playing-details">
+          <span class="now-playing-station" id="nowPlayingStation">—</span>
+        </div>
+        <div class="station-health">
+          <a href="#" id="checkStationsBtn">Проверить станции</a>
+          <span id="stationCheckStatus"></span>
+        </div>
+        <div id="clockBottom" class="clock" style="font-size: 12px; opacity: 0.7; margin-left: auto; padding-left: 12px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Мини-плеер -->
+  <div id="miniPlayer" class="mini-player" style="display: none;">
+    <div class="mini-player-content">
+      <div class="mini-player-info">
+        <div class="mini-player-station" id="miniPlayerStation">—</div>
+        <div class="mini-player-time" id="miniPlayerClock">00:00:00</div>
+      </div>
+      <div class="mini-player-controls">
+        <button id="miniPlayPauseBtn" class="btn-mini btn-mini-primary" title="Воспроизвести/Пауза">
+          <svg id="miniPlayIcon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block;">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <svg id="miniPauseIcon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+          </svg>
+        </button>
+        <button id="miniStopBtn" class="btn-mini btn-mini-secondary" title="Остановить">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="6" width="12" height="12" rx="1"/>
+          </svg>
+        </button>
+        <div class="mini-volume-control">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <input type="range" id="miniVolumeSlider" min="0" max="100" value="50" style="width: 80px;">
+          <span id="miniVolumeValue" style="font-size: 11px; min-width: 30px;">50%</span>
+        </div>
+        <button id="expandPlayerBtn" class="btn-mini btn-mini-icon" title="Развернуть">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+          </svg>
+        </button>
+        <button id="miniExitBtn" class="btn-mini btn-mini-exit" title="Выход">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="stations.js"></script>
+  <script>
+    console.log('stations.js загружен');
+    console.log('getDefaultStations:', typeof window.getDefaultStations);
+    if (window.getDefaultStations) {
+      const stations = window.getDefaultStations();
+      console.log('Станций в stations.js:', stations ? stations.length : 0);
+    }
+  </script>
+  <!-- Модули -->
+  <script src="modules/CountryNames.js"></script>
+  <script src="modules/TranslationManager.js"></script>
+  <script src="modules/ThemeManager.js"></script>
+  <script src="modules/StationSorter.js"></script>
+  <script src="modules/Equalizer.js"></script>
+  <!-- Основной скрипт -->
+  <script src="js/renderer.js?v=3.1.7"></script>
+  <!-- Функции для аккордеонов -->
+  <script>
+    function toggleAccordion(id) {
+      const content = document.getElementById(id);
+      if (!content) return;
+      
+      const header = content.previousElementSibling;
+      
+      if (content.classList.contains('active')) {
+        content.classList.remove('active');
+        if (header) header.classList.remove('active');
+      } else {
+        // Закрыть все остальные аккордеоны
+        document.querySelectorAll('.accordion-content').forEach(acc => {
+          acc.classList.remove('active');
+          const accHeader = acc.previousElementSibling;
+          if (accHeader) accHeader.classList.remove('active');
+        });
+        // Открыть выбранный
+        content.classList.add('active');
+        if (header) header.classList.add('active');
+      }
+    }
+    
+    // Сделать функцию доступной глобально
+    window.toggleAccordion = toggleAccordion;
+    
+    // Открыть первый аккордеон по умолчанию
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        const firstAccordion = document.querySelector('.accordion-content');
+        if (firstAccordion) {
+          firstAccordion.classList.add('active');
+          firstAccordion.previousElementSibling.classList.add('active');
+        }
+      }, 100);
+    });
+  </script>
+  <!-- Мобильная версия: поддержка медиа-кнопок и нативных функций -->
+  <script>
+    // Поддержка медиа-кнопок для мобильных устройств и пультов
+    if (typeof window !== 'undefined' && (window.Capacitor || navigator.userAgent.match(/Mobile|Android|iPhone|iPad/i))) {
+      document.addEventListener('keydown', (e) => {
+        // MediaPlayPause (пробел или медиа-кнопка)
+        if (e.key === ' ' || e.key === 'MediaPlayPause' || e.code === 'MediaPlayPause') {
+          e.preventDefault();
+          const playPauseBtn = document.getElementById('playPauseBtn');
+          if (playPauseBtn) {
+            playPauseBtn.click();
+          }
+        }
+        // MediaStop
+        if (e.key === 'MediaStop' || e.code === 'MediaStop') {
+          e.preventDefault();
+          const stopBtn = document.getElementById('stopBtn');
+          if (stopBtn) {
+            stopBtn.click();
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
