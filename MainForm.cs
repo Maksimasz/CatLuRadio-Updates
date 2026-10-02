@@ -22,11 +22,17 @@ namespace CatLuRadio
         private readonly string dataPath;
         private JObject storeData = new();
         private readonly HttpClient httpClient;
-        // Сериализация записи store.json: без неё параллельные setStore падали
+        // Сериализация записи хранилища: без неё параллельные setStore падали
         // с "file is being used by another process" и изменения терялись.
         private readonly SemaphoreSlim storeLock = new(1, 1);
         private long storeSaveSeq;   // последний выданный номер сохранения
         private long storeSavedSeq;  // последний реально записанный на диск
+
+        // ВАЖНО: имя хранилища намеренно отличается от store.json.
+        // Старая версия приложения использует тот же каталог
+        // %LocalAppData%\CatLuRadio\data и тот же файл store.json — писать туда
+        // из этой версии значит затирать данные, которыми пользуются другие.
+        private const string StoreFileName = "store_v2.json";
         private readonly LibVLC nativeVlc;
         private readonly MediaPlayer nativePlayer;
         private Media? nativeMedia;
@@ -124,12 +130,12 @@ namespace CatLuRadio
 
         private void LoadStore()
         {
-            string storePath = Path.Combine(dataPath, "store.json");
+            string storePath = Path.Combine(dataPath, StoreFileName);
             if (File.Exists(storePath)) {
                 try { storeData = JObject.Parse(File.ReadAllText(storePath)); }
                 catch (Exception ex)
                 {
-                    // store.json повреждён — начинаем с пустого хранилища, но пишем
+                    // Файл хранилища повреждён — начинаем с пустого, но пишем
                     // об этом в лог, иначе пользователь не поймёт, куда делись станции.
                     AppLog.Error("Файл хранилища повреждён, начинаю с пустого: " + storePath, ex);
                     storeData = new JObject();
@@ -154,14 +160,14 @@ namespace CatLuRadio
             // Уже есть запись более нового состояния — эта стала бы откатом.
             if (seq <= Volatile.Read(ref storeSavedSeq)) return;
 
-            string storePath = Path.Combine(dataPath, "store.json");
+            string storePath = Path.Combine(dataPath, StoreFileName);
             await storeLock.WaitAsync();
             try
             {
                 if (seq <= Volatile.Read(ref storeSavedSeq)) return;
 
                 // Пишем во временный файл и подменяем: падение посреди записи
-                // больше не оставляет обрезанный store.json.
+                // больше не оставляет обрезанный файл хранилища.
                 string tempPath = storePath + ".tmp";
                 await File.WriteAllTextAsync(tempPath, snapshot, Encoding.UTF8);
                 File.Move(tempPath, storePath, overwrite: true);
@@ -419,7 +425,7 @@ namespace CatLuRadio
             // иначе финальная запись могла бы конфликтовать с пишущейся задачей.
             bool locked = storeLock.Wait(TimeSpan.FromSeconds(2));
             try {
-                string storePath = Path.Combine(dataPath, "store.json");
+                string storePath = Path.Combine(dataPath, StoreFileName);
                 File.WriteAllText(storePath + ".tmp", storeData.ToString(), Encoding.UTF8);
                 File.Move(storePath + ".tmp", storePath, overwrite: true);
                 // Все сохранения, выданные до этого момента, устарели.
