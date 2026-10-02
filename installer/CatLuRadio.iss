@@ -1,4 +1,4 @@
-#define MyAppName "CatLu Radio"
+﻿#define MyAppName "CatLu Radio"
 #define MyAppVersion "3.1.12"
 #define MyAppPublisher "CatLu"
 #define MyAppExeName "CatLuRadio.exe"
