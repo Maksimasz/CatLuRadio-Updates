@@ -2998,7 +2998,7 @@ function setupIPCListeners() {
   });
   
   register('onShowAbout', () => {
-    alert('CatLu Radio v3.1.7\n\nПриложение для прослушивания интернет-радио.');
+    alert('CatLu Radio v3.1.12\n\nПриложение для прослушивания интернет-радио.');
   });
   
   // При выгрузке страницы помечаем закрытие: stopPlay() в этом случае не
