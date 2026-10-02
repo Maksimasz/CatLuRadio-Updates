@@ -33,6 +33,12 @@ namespace CatLuRadio
         // %LocalAppData%\CatLuRadio\data и тот же файл store.json — писать туда
         // из этой версии значит затирать данные, которыми пользуются другие.
         private const string StoreFileName = "store_v2.json";
+
+        // Файлы, доступ к которым страница получила через системный диалог
+        // (импорт/экспорт). Всё остальное за пределами каталога данных
+        // приложения для AppAPI недоступно — иначе XSS в странице превращался
+        // бы в запись произвольного файла на диске.
+        private readonly HashSet<string> approvedPaths = new(StringComparer.OrdinalIgnoreCase);
         private readonly LibVLC nativeVlc;
         private readonly MediaPlayer nativePlayer;
         private Media? nativeMedia;
@@ -117,6 +123,10 @@ namespace CatLuRadio
                 webView.CoreWebView2.Settings.IsScriptEnabled = true;
                 webView.CoreWebView2.Settings.AreHostObjectsAllowed = false;
                 webView.WebMessageReceived += WebView_WebMessageReceived;
+                // Страница обязана оставаться в нашем wwwroot: иначе любая ссылка
+                // уводила бы окно приложения наружу вместе со всем AppAPI.
+                webView.CoreWebView2.NavigationStarting += CoreWebView2_NavigationStarting;
+                webView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
                 string htmlPath = Path.Combine(AppContext.BaseDirectory, "wwwroot", "index.html");
                 if (File.Exists(htmlPath)) {
                     webView.CoreWebView2.Navigate("file://" + htmlPath.Replace("\\", "/"));
@@ -129,6 +139,51 @@ namespace CatLuRadio
                 AppLog.Error("Ошибка инициализации WebView2", ex);
                 MessageBox.Show("WebView2 initialization error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void CoreWebView2_NavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
+        {
+            if (IsAppPage(e.Uri)) return;
+            e.Cancel = true;
+            AppLog.Warn("Заблокирована навигация страницы: " + e.Uri);
+            // Ссылка без target="_blank" раньше просто уводила приложение с главной
+            // страницы — теперь открывается во внешнем браузере.
+            OpenInBrowser(e.Uri);
+        }
+
+        private void CoreWebView2_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
+        {
+            // WebView2 по умолчанию открыл бы новое окно в этом же WebView —
+            // то есть внешний ресурс получил бы прямой доступ к AppAPI.
+            e.Handled = true;
+            OpenInBrowser(e.Uri);
+        }
+
+        /// <summary>Страница лежит в нашем wwwroot (или это about:).</summary>
+        private static bool IsAppPage(string uri)
+        {
+            if (!Uri.TryCreate(uri, UriKind.Absolute, out var parsed)) return false;
+            if (!parsed.IsFile) return parsed.Scheme == "about";
+            try
+            {
+                string wwwroot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "wwwroot"))
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+                return Path.GetFullPath(parsed.LocalPath)
+                    .StartsWith(wwwroot, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        private static void OpenInBrowser(string uri)
+        {
+            try
+            {
+                if (!Uri.TryCreate(uri, UriKind.Absolute, out var parsed)) return;
+                if (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps) return;
+                Process.Start(new ProcessStartInfo(parsed.AbsoluteUri) { UseShellExecute = true });
+            }
+            catch (Exception ex) { AppLog.Error("Не удалось открыть ссылку во внешнем браузере: " + uri, ex); }
         }
 
         private void LoadStore()
@@ -402,21 +457,64 @@ namespace CatLuRadio
         }
         private void ShowSaveDialog(string defaultPath, string callbackId) {
             using var dialog = new SaveFileDialog { FileName = Path.GetFileName(defaultPath), Filter = "JSON files|*.json|All files|*.*", Title = "Save file" };
-            if (dialog.ShowDialog() == DialogResult.OK) SendCallback(callbackId, new ApiResponse { Success = true, FilePath = dialog.FileName });
+            if (dialog.ShowDialog() == DialogResult.OK) {
+                ApprovePath(dialog.FileName);
+                SendCallback(callbackId, new ApiResponse { Success = true, FilePath = dialog.FileName });
+            }
             else SendCallback(callbackId, new ApiResponse { Success = false });
         }
         private void ShowOpenDialog(string callbackId) {
             using var dialog = new OpenFileDialog { Filter = "JSON files|*.json|All files|*.*", Title = "Select file" };
-            if (dialog.ShowDialog() == DialogResult.OK) SendCallback(callbackId, new ApiResponse { Success = true, Data = new[] { dialog.FileName } });
+            if (dialog.ShowDialog() == DialogResult.OK) {
+                ApprovePath(dialog.FileName);
+                SendCallback(callbackId, new ApiResponse { Success = true, Data = new[] { dialog.FileName } });
+            }
             else SendCallback(callbackId, new ApiResponse { Success = false });
         }
+
+        /// <summary>
+        /// Разрешает доступ к файлу, который пользователь явно выбрал в системном
+        /// диалоге (импорт/экспорт станций). Путь запоминается на время сессии.
+        /// </summary>
+        private void ApprovePath(string path) {
+            try { approvedPaths.Add(Path.GetFullPath(path)); }
+            catch (Exception ex) { AppLog.Warn("Не удалось запомнить путь из диалога: " + path, ex); }
+        }
+
+        /// <summary>
+        /// Каталог данных приложения и пути, выбранные пользователем в диалоге.
+        /// Всё остальное — отказ.
+        /// </summary>
+        private bool IsPathAllowed(string path) {
+            if (string.IsNullOrWhiteSpace(path)) return false;
+            string full;
+            try { full = Path.GetFullPath(path); }
+            catch { return false; }
+
+            if (approvedPaths.Contains(full)) return true;
+
+            string root = Path.GetFullPath(dataPath)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            return full.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+        }
         private async Task WriteFile(string path, string content, string callbackId) {
+            if (!IsPathAllowed(path)) {
+                AppLog.Warn("Отказ в записи файла из страницы: " + path);
+                SendCallback(callbackId, new ApiResponse { Success = false, Error = "Файл за пределами каталога приложения: " + path });
+                return;
+            }
             try {
                 await File.WriteAllTextAsync(path, content, Encoding.UTF8);
                 SendCallback(callbackId, new ApiResponse { Success = true });
             } catch (Exception ex) { SendCallback(callbackId, new ApiResponse { Success = false, Error = ex.Message }); }
         }
         private async Task ReadFile(string path, string callbackId) {
+            if (!IsPathAllowed(path)) {
+                AppLog.Warn("Отказ в чтении файла из страницы: " + path);
+                SendCallback(callbackId, new ApiResponse { Success = false, Error = "Файл за пределами каталога приложения: " + path });
+                return;
+            }
             try {
                 string content = await File.ReadAllTextAsync(path, Encoding.UTF8);
                 SendCallback(callbackId, new ApiResponse { Success = true, Content = content });
