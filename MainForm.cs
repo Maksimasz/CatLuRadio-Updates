@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -21,6 +22,11 @@ namespace CatLuRadio
         private readonly string dataPath;
         private JObject storeData = new();
         private readonly HttpClient httpClient;
+        // Сериализация записи store.json: без неё параллельные setStore падали
+        // с "file is being used by another process" и изменения терялись.
+        private readonly SemaphoreSlim storeLock = new(1, 1);
+        private long storeSaveSeq;   // последний выданный номер сохранения
+        private long storeSavedSeq;  // последний реально записанный на диск
         private readonly LibVLC nativeVlc;
         private readonly MediaPlayer nativePlayer;
         private Media? nativeMedia;
@@ -48,7 +54,7 @@ namespace CatLuRadio
             Directory.CreateDirectory(dataPath);
 
             httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            httpClient.DefaultRequestHeaders.Add("User-Agent", "CatLuRadio/3.1.7");
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "CatLuRadio/" + Application.ProductVersion);
             Core.Initialize(Path.Combine(AppContext.BaseDirectory, "libvlc", "win-x64"));
             nativeVlc = new LibVLC("--no-video", "--network-caching=1000");
             nativePlayer = new MediaPlayer(nativeVlc);
@@ -76,6 +82,7 @@ namespace CatLuRadio
             }
             catch (Exception ex)
             {
+                AppLog.Error("Ошибка инициализации формы", ex);
                 MessageBox.Show("InitializeComponent error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 this.ResumeLayout(false);
             }
@@ -89,6 +96,9 @@ namespace CatLuRadio
                 var fixedRuntime = Directory.Exists(runtimeRoot)
                     ? Directory.EnumerateDirectories(runtimeRoot).FirstOrDefault(folder => File.Exists(Path.Combine(folder, "msedgewebview2.exe")))
                     : null;
+                AppLog.Info(fixedRuntime is null
+                    ? "WebView2: используется встроенный в систему рантайм"
+                    : "WebView2: фиксированный рантайм " + Path.GetFileName(fixedRuntime));
                 var env = await CoreWebView2Environment.CreateAsync(
                     browserExecutableFolder: fixedRuntime,
                     userDataFolder: Path.Combine(dataPath, "WebView2"));
@@ -102,10 +112,12 @@ namespace CatLuRadio
                 if (File.Exists(htmlPath)) {
                     webView.CoreWebView2.Navigate("file://" + htmlPath.Replace("\\", "/"));
                 } else {
+                    AppLog.Error("Главный файл интерфейса не найден: " + htmlPath);
                     MessageBox.Show("HTML file not found:\n" + htmlPath, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
             catch (Exception ex) {
+                AppLog.Error("Ошибка инициализации WebView2", ex);
                 MessageBox.Show("WebView2 initialization error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -115,22 +127,65 @@ namespace CatLuRadio
             string storePath = Path.Combine(dataPath, "store.json");
             if (File.Exists(storePath)) {
                 try { storeData = JObject.Parse(File.ReadAllText(storePath)); }
-                catch { storeData = new JObject(); }
+                catch (Exception ex)
+                {
+                    // store.json повреждён — начинаем с пустого хранилища, но пишем
+                    // об этом в лог, иначе пользователь не поймёт, куда делись станции.
+                    AppLog.Error("Файл хранилища повреждён, начинаю с пустого: " + storePath, ex);
+                    storeData = new JObject();
+                }
             } else { storeData = new JObject(); }
         }
 
-        private async Task SaveStoreAsync()
+        /// <summary>
+        /// Снимок текущего состояния и запуск записи на диск.
+        /// Снимок берётся здесь же, в UI-потоке: storeData мутируется только в нём,
+        /// а Newtonsoft JObject не потокобезопасен при одновременных чтении и записи.
+        /// </summary>
+        private void RequestSaveStore()
         {
+            long seq = Interlocked.Increment(ref storeSaveSeq);
+            string snapshot = storeData.ToString(Formatting.None);
+            _ = SaveStoreAsync(seq, snapshot);
+        }
+
+        private async Task SaveStoreAsync(long seq, string snapshot)
+        {
+            // Уже есть запись более нового состояния — эта стала бы откатом.
+            if (seq <= Volatile.Read(ref storeSavedSeq)) return;
+
             string storePath = Path.Combine(dataPath, "store.json");
-            await File.WriteAllTextAsync(storePath, storeData.ToString());
+            await storeLock.WaitAsync();
+            try
+            {
+                if (seq <= Volatile.Read(ref storeSavedSeq)) return;
+
+                // Пишем во временный файл и подменяем: падение посреди записи
+                // больше не оставляет обрезанный store.json.
+                string tempPath = storePath + ".tmp";
+                await File.WriteAllTextAsync(tempPath, snapshot, Encoding.UTF8);
+                File.Move(tempPath, storePath, overwrite: true);
+                Volatile.Write(ref storeSavedSeq, seq);
+            }
+            catch (Exception ex)
+            {
+                // Задача выполняется без await: без этого catch исключение терялось бы
+                // полностью (теперь ещё и ловится UnobservedTaskException в Program.cs).
+                AppLog.Error("Не удалось сохранить хранилище " + storePath, ex);
+            }
+            finally
+            {
+                storeLock.Release();
+            }
         }
 
         private void WebView_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
+            JObject? data = null;
             try
             {
                 string message = e.TryGetWebMessageAsString();
-                var data = JObject.Parse(message);
+                data = JObject.Parse(message);
                 string action = data["action"]?.ToString() ?? "";
                 string callbackId = data["callbackId"]?.ToString() ?? "";
                 
@@ -143,7 +198,7 @@ namespace CatLuRadio
                     case "setStore":
                         key = data["key"]?.ToString() ?? "";
                         storeData[key] = data["value"];
-                        _ = SaveStoreAsync();
+                        RequestSaveStore();
                         SendCallback(callbackId, new { success = true });
                         break;
                     case "httpGet":
@@ -213,9 +268,19 @@ namespace CatLuRadio
                         SetMiniPlayer(data["enabled"]?.Value<bool>() == true);
                         SendCallback(callbackId, new { success = true });
                         break;
+                    default:
+                        // Раньше неизвестное действие молча игнорировалось: callback
+                        // не отправлялся, и промис в странице висел навсегда.
+                        AppLog.Warn($"Неизвестное действие из страницы: '{action}'");
+                        SendCallback(callbackId, new { success = false, error = "Неизвестное действие: " + action });
+                        break;
                 }
             }
-            catch (Exception ex) { Console.WriteLine("Message processing error: " + ex.Message); }
+            catch (Exception ex)
+            {
+                // Раньше ошибка молча уходила в Console.WriteLine, которого в WinExe нет.
+                AppLog.Error($"Ошибка обработки сообщения из страницы (action={data?["action"]})", ex);
+            }
         }
 
         private void SetWindowSize(int width, int height) {
@@ -248,7 +313,13 @@ namespace CatLuRadio
                 var tag = release["tag_name"]?.ToString().TrimStart('v', 'V') ?? "";
                 var asset = release["assets"]?.FirstOrDefault(item => item?["name"]?.ToString().EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true);
                 var url = asset?["browser_download_url"]?.ToString() ?? "";
-                var hasUpdate = Version.TryParse(tag, out var latest) && Version.TryParse(Application.ProductVersion, out var current) && latest > current;
+                // Сравниваем именно версию сборки: она всегда чисто числовая (3.1.12.0),
+                // тогда как ProductVersion (InformationalVersion) может быть
+                // дополнен хешем коммита вида 3.1.12+abcdef и не парсится.
+                var currentVersion = Assembly.GetExecutingAssembly().GetName().Version;
+                var hasUpdate = Version.TryParse(tag, out var latest)
+                    && currentVersion is not null
+                    && latest > currentVersion;
                 SendCallback(callbackId, new { success = true, hasUpdate, version = tag, url });
             } catch (Exception ex) { SendCallback(callbackId, new { success = false, error = ex.Message }); }
         }
@@ -344,8 +415,18 @@ namespace CatLuRadio
         }
         protected override void OnFormClosing(FormClosingEventArgs e) {
             base.OnFormClosing(e);
-            try { File.WriteAllText(Path.Combine(dataPath, "store.json"), storeData.ToString()); }
-            catch { }
+            // Ждём незавершённых записей (коротко: приложение закрывается),
+            // иначе финальная запись могла бы конфликтовать с пишущейся задачей.
+            bool locked = storeLock.Wait(TimeSpan.FromSeconds(2));
+            try {
+                string storePath = Path.Combine(dataPath, "store.json");
+                File.WriteAllText(storePath + ".tmp", storeData.ToString(), Encoding.UTF8);
+                File.Move(storePath + ".tmp", storePath, overwrite: true);
+                // Все сохранения, выданные до этого момента, устарели.
+                Volatile.Write(ref storeSavedSeq, Volatile.Read(ref storeSaveSeq));
+            }
+            catch (Exception ex) { AppLog.Error("Не удалось сохранить хранилище при выходе", ex); }
+            finally { if (locked) storeLock.Release(); }
             httpClient.Dispose();
             StopNative();
             nativeEqualizer?.Dispose();

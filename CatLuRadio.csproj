@@ -15,6 +15,10 @@
     <Version>3.1.12</Version>
     <AssemblyVersion>3.1.12.0</AssemblyVersion>
     <FileVersion>3.1.12.0</FileVersion>
+    <!-- SDK дописывает хеш коммита к InformationalVersion (3.1.12+abcdef...).
+         Из-за этого ломается Version.TryParse в CheckForUpdate — обновления
+         перестают находиться — и хеш попадает в заголовок окна. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Authors></Authors>
     <Company>CatLu</Company>
     <Product>CatLu Radio</Product>
