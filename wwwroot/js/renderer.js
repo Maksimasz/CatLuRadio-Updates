@@ -958,12 +958,28 @@ async function playStation(station) {
       return;
     }
   }
-  
-  // Определить формат потока по расширению или URL
+
+  // Резервный путь: LibVLC не запустил поток или включён кроссфейд —
+  // дальше воспроизведение идёт через <audio>/HLS/Web Audio в самой странице.
+  await playInBrowserPlayer({ station, streamUrl, oldAudio, useCrossfade, crossfadeDuration });
+}
+
+
+/**
+ * Резервное воспроизведение в браузере: <audio>, HLS.js и Web Audio (эквалайзер).
+ * Вызывается из playStation(), когда LibVLC не взял поток или когда нужен
+ * кроссфейд — нативный плеер не умеет плавно переходить между станциями.
+ */
+/**
+ * Определяет формат потока по расширению/параметрам URL и проверяет,
+ * поддерживает ли браузер HLS. Чистая функция — ни состояния, ни побочных
+ * эффектов, поэтому легко проверяется отдельно от воспроизведения.
+ */
+function detectStreamFormat(streamUrl) {
   const urlLower = streamUrl.toLowerCase();
-  let contentType = '';
   const isHLS = urlLower.includes('.m3u8') || urlLower.includes('.m3u');
-  
+  let contentType = '';
+
   if (urlLower.includes('.mp3') || urlLower.includes('/mp3') || urlLower.includes('type=mp3')) {
     contentType = 'audio/mpeg';
   } else if (urlLower.includes('.aac') || urlLower.includes('.aacp') || urlLower.includes('type=aac')) {
@@ -975,171 +991,162 @@ async function playStation(station) {
   } else if (urlLower.includes('.wav')) {
     contentType = 'audio/wav';
   }
-  
-  // Проверить поддержку HLS
+
   const hlsSupported = typeof Hls !== 'undefined' && Hls.isSupported();
-  const useHLS = isHLS && hlsSupported;
-  
-  // Для MP3 потоков добавить параметры для более надежной загрузки
-  // Некоторые потоки требуют явного указания формата
-  if (contentType === 'audio/mpeg' && !streamUrl.includes('?')) {
-    // Добавить параметр для явного указания типа контента (если сервер поддерживает)
-    // Но не всегда это работает, поэтому используем другой подход
-  }
-  
-  // Создать новый аудио элемент с правильными настройками
-  const audioElement = new Audio();
-  // Если используется crossfade, начать с нулевой громкости
-  audioElement.volume = useCrossfade ? 0 : state.volume;
-  audioElement.preload = 'auto';
-  
-  // Прямые потоки играем без Web Audio API: часть порталов при CORS-режиме молчит.
-  const equalizerEnabled = useHLS && state.settings.equalizer && state.settings.equalizer.enabled && window.Equalizer;
-  if (useHLS) {
-    audioElement.crossOrigin = 'anonymous';
-  }
-  
-  // Инициализировать HLS если это HLS поток
-  if (useHLS) {
-    // Остановить предыдущий HLS если есть
-    if (state.hls) {
-      try {
-        state.hls.stopLoad();
-        state.hls.detachMedia();
-        state.hls.destroy();
-      } catch (e) {
-        console.error('Ошибка при остановке предыдущего HLS:', e);
-      }
-      state.hls = null;
+  return { contentType, isHLS, hlsSupported, useHLS: isHLS && hlsSupported };
+}
+
+/**
+ * Ошибка <audio>: сначала повторные загрузки, потом запасной запуск через LibVLC,
+ * и только если всё не помогло — финальный отказ пользователю.
+ * Вынесена отдельно: это самая ветвящаяся часть воспроизведения.
+ *
+ * retryState общий с handleStalled — оба следят за одним аудио-элементом.
+ */
+function createStreamErrorHandler({ station, streamUrl, audioElement, contentType, retryState }) {
+  return async (e) => {
+    // Не показывать ошибку если это программная остановка или элемент уже не активен
+    if (state.isStopping || state.audio !== audioElement || state.isSwitching) {
+      return;
+    }
+    if (state.isPlaying) return;
+    
+    const errorCode = audioElement.error?.code;
+    const errorMessage = audioElement.error?.message || '';
+    
+    console.error('Audio error:', {
+      code: errorCode,
+      message: errorMessage,
+      url: streamUrl,
+      readyState: audioElement.readyState,
+      networkState: audioElement.networkState
+    });
+    
+    // Коды ошибок:
+    // MEDIA_ERR_ABORTED (1) - загрузка прервана пользователем
+    // MEDIA_ERR_NETWORK (2) - ошибка сети
+    // MEDIA_ERR_DECODE (3) - ошибка декодирования
+    // MEDIA_ERR_SRC_NOT_SUPPORTED (4) - формат не поддерживается
+    
+    if (errorCode === 1) {
+      // Прервано пользователем - не показывать ошибку
+      return;
     }
     
-    // Создать новый экземпляр HLS
-    const hls = new Hls({
-      enableWorker: true,
-      lowLatencyMode: false,
-      backBufferLength: 90
-    });
-    
-    state.hls = hls;
-    
-    // Привязать HLS к audio элементу
-    hls.loadSource(streamUrl);
-    hls.attachMedia(audioElement);
-    
-    // Обработчики событий HLS
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      console.log('HLS manifest parsed');
-      if (!state.isStopping && state.audio === audioElement) {
-        // Начать воспроизведение после парсинга манифеста
-        audioElement.play().then(() => {
-          if (useCrossfade && audioElement.volume === 0) {
-            fadeInVolume(audioElement, crossfadeDuration);
-          }
-        }).catch(error => {
-          console.error('HLS play error:', error);
-          alert('Ошибка воспроизведения HLS потока: ' + station.name);
-          state.isPlaying = false;
-      // Обновить медиа-сессию
-      if ('mediaSession' in navigator) {
-        try {
-          navigator.mediaSession.playbackState = 'paused';
-        } catch (e) {}
-      }
-          state.currentStation = null;
-          state.isSwitching = false;
-        });
-      }
-    });
-    
-    hls.on(Hls.Events.ERROR, (event, data) => {
-      console.error('HLS error:', data);
-      if (data.fatal) {
-        switch (data.type) {
-          case Hls.ErrorTypes.NETWORK_ERROR:
-            console.error('HLS network error, trying to recover');
-            hls.startLoad();
-            break;
-          case Hls.ErrorTypes.MEDIA_ERROR:
-            console.error('HLS media error, trying to recover');
-            hls.recoverMediaError();
-            break;
-          default:
-            console.error('HLS fatal error, cannot recover');
-            hls.destroy();
-            alert('Ошибка загрузки HLS потока: ' + station.name + '\nФормат аудио не поддерживается.\n\nURL: ' + streamUrl);
-            state.isPlaying = false;
-      // Обновить медиа-сессию
-      if ('mediaSession' in navigator) {
-        try {
-          navigator.mediaSession.playbackState = 'paused';
-        } catch (e) {}
-      }
-            state.currentStation = null;
-            state.isSwitching = false;
-            break;
+    // Для MP3 потоков попробовать перезагрузить с более длительной задержкой
+    if (contentType === 'audio/mpeg' && retryState.retryCount < retryState.maxRetries) {
+      retryState.retryCount++;
+      console.log(`Попытка перезагрузки MP3 потока (попытка ${retryState.retryCount}/${retryState.maxRetries})`);
+      
+      // Очистить текущий источник
+      audioElement.src = '';
+      audioElement.load();
+      
+      // Подождать и попробовать снова с более длительной задержкой для MP3
+      setTimeout(() => {
+        if (!state.isStopping && !state.isPlaying && state.audio === audioElement) {
+          audioElement.src = streamUrl;
+          // Для MP3 дать больше времени на загрузку перед вызовом load()
+          setTimeout(() => {
+            if (!state.isStopping && !state.isPlaying && state.audio === audioElement) {
+              audioElement.load();
+            }
+          }, 100);
         }
+      }, 1500); // Увеличиваем задержку для MP3 потоков
+      
+      return; // Не показывать ошибку пока есть попытки
+    }
+    
+    // Попробовать перезагрузить при ошибках сети или декодирования для других форматов
+    if (retryState.retryCount < retryState.maxRetries && (errorCode === 2 || errorCode === 3 || errorCode === 4)) {
+      retryState.retryCount++;
+      // Попытка перезагрузки потока
+      
+      // Очистить текущий источник
+      audioElement.src = '';
+      audioElement.load();
+      
+      // Подождать и попробовать снова
+      setTimeout(() => {
+        if (!state.isStopping && !state.isPlaying && state.audio === audioElement) {
+          audioElement.src = streamUrl;
+          audioElement.load();
+        }
+      }, 1000); // Увеличиваем задержку для перезагрузки
+      
+      return; // Не показывать ошибку пока есть попытки
+    }
+    
+    // Несколько error-событий могут прийти подряд, пока запланированная
+    // повторная загрузка уже запускает звук. Решение об отключении станции
+    // принимаем один раз и только после короткого периода стабилизации.
+    if (retryState.terminalErrorPending) return;
+    retryState.terminalErrorPending = true;
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    if (state.isPlaying || state.audio !== audioElement || state.isStopping) {
+      retryState.terminalErrorPending = false;
+      return;
+    }
+
+    // Поток может быть живым, но WebView2 не принимать старый HTTP/Icecast.
+    // После сетевой проверки запускаем его проигрывателем Windows.
+    const streamCheck = await window.AppAPI.checkStream(streamUrl);
+    if (streamUrl.startsWith('http://') && streamCheck?.success) {
+      const nativeResult = await window.AppAPI.playNative(streamUrl, state.volume);
+      if (nativeResult?.success && state.audio === audioElement && !state.isStopping) {
+        audioElement.src = '';
+        state.audio = null;
+        state.nativeAudio = true;
+        state.isPlaying = true;
+        state.currentStation = station;
+        station.incompatible = false;
+        state.stationHealth[station.id] = true;
+        rememberLastStation(station);
+        updateNowPlaying(station.name);
+        updatePlayButton();
+        if (!station.preview) addToHistory(station);
+        renderStations(state.stations);
+        renderFavorites();
+        if (!station.preview) saveData();
+        return;
       }
-    });
-  } else if (isHLS && !hlsSupported) {
-    // HLS не поддерживается браузером
-    alert('HLS потоки (m3u8) не поддерживаются в этом браузере.\n\nПопробуйте использовать другой поток или обновить браузер.');
+    }
+
+    // Сбросить флаг переключения при ошибке
     state.isSwitching = false;
-    return;
-  }
-  
-  // Инициализировать эквалайзер если он включен
-  if (equalizerEnabled) {
-    if (!state.equalizer) {
-      state.equalizer = new window.Equalizer();
-    }
     
-    // Отключить старый эквалайзер если есть
-    state.equalizer.disconnect();
-    
-    // Инициализировать с новым аудио элементом
-    // Важно: это должно быть сделано ПОСЛЕ установки crossOrigin, но ДО установки src
-    // Но init будет вызван после установки src, поэтому crossOrigin уже установлен
-  }
-  
-  // Установить источник напрямую (только если не HLS, для HLS источник устанавливается через hls.loadSource)
-  if (!useHLS) {
-    // Для потоков без расширения браузер сам определит формат по заголовкам
-    // Для MP3 потоков убедимся, что URL правильно обработан
-    if (contentType === 'audio/mpeg') {
-      // Для MP3 потоков убедимся, что URL не содержит проблемных символов
-      // и правильно закодирован
-      try {
-        const urlObj = new URL(streamUrl);
-        // Если URL валидный, используем его как есть
-        audioElement.src = streamUrl;
-      } catch (e) {
-        // Если URL невалидный, попробуем использовать как есть (может быть относительный)
-        audioElement.src = streamUrl;
-      }
+    let userErrorMessage = 'Ошибка загрузки станции: ' + station.name;
+    if (errorCode === 2) {
+      userErrorMessage += '\nПроблема с сетью. Проверьте подключение к интернету.';
+    } else if (errorCode === 3) {
+      userErrorMessage += '\nОшибка декодирования аудио. Возможно, формат не поддерживается.';
+    } else if (errorCode === 4) {
+      userErrorMessage += '\nПоток не удалось открыть или его формат не поддерживается.';
     } else {
-      audioElement.src = streamUrl;
-    }
-  }
-  
-  // Инициализировать эквалайзер ПОСЛЕ установки src (но crossOrigin уже установлен выше)
-  if (equalizerEnabled && state.equalizer) {
-    // Инициализировать с новым аудио элементом
-    if (state.equalizer.init(audioElement)) {
-      // Применить сохраненные настройки
-      if (state.settings.equalizer.values) {
-        state.equalizer.setValues(state.settings.equalizer.values);
-      }
-      if (state.settings.equalizer.preset) {
-        state.equalizer.setPreset(state.settings.equalizer.preset);
+      userErrorMessage += '\nКод ошибки: ' + errorCode;
+      if (errorMessage) {
+        userErrorMessage += '\n' + errorMessage;
       }
     }
-  }
-  
-  // Переменная для отслеживания попыток перезагрузки (должна быть доступна во всех обработчиках)
-  let retryCount = 0;
-  const maxRetries = 2;
-  let terminalErrorPending = false;
-  
+    
+    if (retryState.retryCount >= retryState.maxRetries && await tryRecoverStation(station, streamUrl)) return;
+    state.isPlaying = false;
+    state.audio = null;
+    state.stationHealth[station.id] = false;
+    state.currentStation = null;
+    updateNowPlaying('—');
+    renderStations(state.stations);
+    saveData();
+    alert(userErrorMessage + '\n\nРабочий резервный поток не найден.');
+  };
+}
+
+/**
+ * Вешает обработчики <audio> на элемент: обновление статуса, кроссфейд,
+ * повторные загрузки и запуск через LibVLC при ошибке (см. createStreamErrorHandler).
+ */
+function bindAudioElementEvents({ station, streamUrl, audioElement, contentType, useCrossfade, crossfadeDuration, oldAudio, retryState }) {
   // Обработчики событий
   const handleLoadStart = () => {
     if (!state.isStopping && state.audio === audioElement) {
@@ -1296,152 +1303,17 @@ async function playStation(station) {
     }
   };
   
-  const handleError = async (e) => {
-    // Не показывать ошибку если это программная остановка или элемент уже не активен
-    if (state.isStopping || state.audio !== audioElement || state.isSwitching) {
-      return;
-    }
-    if (state.isPlaying) return;
-    
-    const errorCode = audioElement.error?.code;
-    const errorMessage = audioElement.error?.message || '';
-    
-    console.error('Audio error:', {
-      code: errorCode,
-      message: errorMessage,
-      url: streamUrl,
-      readyState: audioElement.readyState,
-      networkState: audioElement.networkState
-    });
-    
-    // Коды ошибок:
-    // MEDIA_ERR_ABORTED (1) - загрузка прервана пользователем
-    // MEDIA_ERR_NETWORK (2) - ошибка сети
-    // MEDIA_ERR_DECODE (3) - ошибка декодирования
-    // MEDIA_ERR_SRC_NOT_SUPPORTED (4) - формат не поддерживается
-    
-    if (errorCode === 1) {
-      // Прервано пользователем - не показывать ошибку
-      return;
-    }
-    
-    // Для MP3 потоков попробовать перезагрузить с более длительной задержкой
-    if (contentType === 'audio/mpeg' && retryCount < maxRetries) {
-      retryCount++;
-      console.log(`Попытка перезагрузки MP3 потока (попытка ${retryCount}/${maxRetries})`);
-      
-      // Очистить текущий источник
-      audioElement.src = '';
-      audioElement.load();
-      
-      // Подождать и попробовать снова с более длительной задержкой для MP3
-      setTimeout(() => {
-        if (!state.isStopping && !state.isPlaying && state.audio === audioElement) {
-          audioElement.src = streamUrl;
-          // Для MP3 дать больше времени на загрузку перед вызовом load()
-          setTimeout(() => {
-            if (!state.isStopping && !state.isPlaying && state.audio === audioElement) {
-              audioElement.load();
-            }
-          }, 100);
-        }
-      }, 1500); // Увеличиваем задержку для MP3 потоков
-      
-      return; // Не показывать ошибку пока есть попытки
-    }
-    
-    // Попробовать перезагрузить при ошибках сети или декодирования для других форматов
-    if (retryCount < maxRetries && (errorCode === 2 || errorCode === 3 || errorCode === 4)) {
-      retryCount++;
-      // Попытка перезагрузки потока
-      
-      // Очистить текущий источник
-      audioElement.src = '';
-      audioElement.load();
-      
-      // Подождать и попробовать снова
-      setTimeout(() => {
-        if (!state.isStopping && !state.isPlaying && state.audio === audioElement) {
-          audioElement.src = streamUrl;
-          audioElement.load();
-        }
-      }, 1000); // Увеличиваем задержку для перезагрузки
-      
-      return; // Не показывать ошибку пока есть попытки
-    }
-    
-    // Несколько error-событий могут прийти подряд, пока запланированная
-    // повторная загрузка уже запускает звук. Решение об отключении станции
-    // принимаем один раз и только после короткого периода стабилизации.
-    if (terminalErrorPending) return;
-    terminalErrorPending = true;
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    if (state.isPlaying || state.audio !== audioElement || state.isStopping) {
-      terminalErrorPending = false;
-      return;
-    }
-
-    // Поток может быть живым, но WebView2 не принимать старый HTTP/Icecast.
-    // После сетевой проверки запускаем его проигрывателем Windows.
-    const streamCheck = await window.AppAPI.checkStream(streamUrl);
-    if (streamUrl.startsWith('http://') && streamCheck?.success) {
-      const nativeResult = await window.AppAPI.playNative(streamUrl, state.volume);
-      if (nativeResult?.success && state.audio === audioElement && !state.isStopping) {
-        audioElement.src = '';
-        state.audio = null;
-        state.nativeAudio = true;
-        state.isPlaying = true;
-        state.currentStation = station;
-        station.incompatible = false;
-        state.stationHealth[station.id] = true;
-        rememberLastStation(station);
-        updateNowPlaying(station.name);
-        updatePlayButton();
-        if (!station.preview) addToHistory(station);
-        renderStations(state.stations);
-        renderFavorites();
-        if (!station.preview) saveData();
-        return;
-      }
-    }
-
-    // Сбросить флаг переключения при ошибке
-    state.isSwitching = false;
-    
-    let userErrorMessage = 'Ошибка загрузки станции: ' + station.name;
-    if (errorCode === 2) {
-      userErrorMessage += '\nПроблема с сетью. Проверьте подключение к интернету.';
-    } else if (errorCode === 3) {
-      userErrorMessage += '\nОшибка декодирования аудио. Возможно, формат не поддерживается.';
-    } else if (errorCode === 4) {
-      userErrorMessage += '\nПоток не удалось открыть или его формат не поддерживается.';
-    } else {
-      userErrorMessage += '\nКод ошибки: ' + errorCode;
-      if (errorMessage) {
-        userErrorMessage += '\n' + errorMessage;
-      }
-    }
-    
-    if (retryCount >= maxRetries && await tryRecoverStation(station, streamUrl)) return;
-    state.isPlaying = false;
-    state.audio = null;
-    state.stationHealth[station.id] = false;
-    state.currentStation = null;
-    updateNowPlaying('—');
-    renderStations(state.stations);
-    saveData();
-    alert(userErrorMessage + '\n\nРабочий резервный поток не найден.');
-  };
+  const handleError = createStreamErrorHandler({ station, streamUrl, audioElement, contentType, retryState });
   
   const handleStalled = () => {
     if (!state.isStopping && state.audio === audioElement) {
       // Поток остановлен (stalled)
       
       // Для MP3 и AAC потоков попробовать перезагрузить при зависании
-      if ((contentType === 'audio/mpeg' || contentType === 'audio/aac') && retryCount < maxRetries) {
+      if ((contentType === 'audio/mpeg' || contentType === 'audio/aac') && retryState.retryCount < retryState.maxRetries) {
         setTimeout(() => {
           if (!state.isStopping && !state.isPlaying && state.audio === audioElement && audioElement.readyState < 2) {
-            retryCount++;
+            retryState.retryCount++;
             // Перезагрузка зависшего потока
             audioElement.load();
           }
@@ -1492,6 +1364,171 @@ async function playStation(station) {
   audioElement.addEventListener('stalled', handleStalled);
   audioElement.addEventListener('waiting', handleWaiting);
   audioElement.addEventListener('suspend', handleSuspend);
+}
+
+/**
+ * Подключает HLS.js к аудио-элементу: останавливает предыдущую сессию,
+ * создаёт новую, запускает загрузку и вешает обработчики восстановления после ошибок.
+ */
+function setupHlsSession({ audioElement, streamUrl, station, useCrossfade, crossfadeDuration }) {
+  // Остановить предыдущий HLS если есть
+  if (state.hls) {
+    try {
+      state.hls.stopLoad();
+      state.hls.detachMedia();
+      state.hls.destroy();
+    } catch (e) {
+      console.error('Ошибка при остановке предыдущего HLS:', e);
+    }
+    state.hls = null;
+  }
+  
+  // Создать новый экземпляр HLS
+  const hls = new Hls({
+    enableWorker: true,
+    lowLatencyMode: false,
+    backBufferLength: 90
+  });
+  
+  state.hls = hls;
+  
+  // Привязать HLS к audio элементу
+  hls.loadSource(streamUrl);
+  hls.attachMedia(audioElement);
+  
+  // Обработчики событий HLS
+  hls.on(Hls.Events.MANIFEST_PARSED, () => {
+    console.log('HLS manifest parsed');
+    if (!state.isStopping && state.audio === audioElement) {
+      // Начать воспроизведение после парсинга манифеста
+      audioElement.play().then(() => {
+        if (useCrossfade && audioElement.volume === 0) {
+          fadeInVolume(audioElement, crossfadeDuration);
+        }
+      }).catch(error => {
+        console.error('HLS play error:', error);
+        alert('Ошибка воспроизведения HLS потока: ' + station.name);
+        state.isPlaying = false;
+    // Обновить медиа-сессию
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.playbackState = 'paused';
+      } catch (e) {}
+    }
+        state.currentStation = null;
+        state.isSwitching = false;
+      });
+    }
+  });
+  
+  hls.on(Hls.Events.ERROR, (event, data) => {
+    console.error('HLS error:', data);
+    if (data.fatal) {
+      switch (data.type) {
+        case Hls.ErrorTypes.NETWORK_ERROR:
+          console.error('HLS network error, trying to recover');
+          hls.startLoad();
+          break;
+        case Hls.ErrorTypes.MEDIA_ERROR:
+          console.error('HLS media error, trying to recover');
+          hls.recoverMediaError();
+          break;
+        default:
+          console.error('HLS fatal error, cannot recover');
+          hls.destroy();
+          alert('Ошибка загрузки HLS потока: ' + station.name + '\nФормат аудио не поддерживается.\n\nURL: ' + streamUrl);
+          state.isPlaying = false;
+    // Обновить медиа-сессию
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.playbackState = 'paused';
+      } catch (e) {}
+    }
+          state.currentStation = null;
+          state.isSwitching = false;
+          break;
+      }
+    }
+  });
+}
+
+async function playInBrowserPlayer({ station, streamUrl, oldAudio, useCrossfade, crossfadeDuration }) {
+  const { contentType, isHLS, hlsSupported, useHLS } = detectStreamFormat(streamUrl);
+  
+  // Создать новый аудио элемент с правильными настройками
+  const audioElement = new Audio();
+  // Если используется crossfade, начать с нулевой громкости
+  audioElement.volume = useCrossfade ? 0 : state.volume;
+  audioElement.preload = 'auto';
+  
+  // Прямые потоки играем без Web Audio API: часть порталов при CORS-режиме молчит.
+  const equalizerEnabled = useHLS && state.settings.equalizer && state.settings.equalizer.enabled && window.Equalizer;
+  if (useHLS) {
+    audioElement.crossOrigin = 'anonymous';
+  }
+  
+  // Инициализировать HLS если это HLS поток
+  if (useHLS) {
+    setupHlsSession({ audioElement, streamUrl, station, useCrossfade, crossfadeDuration });
+  } else if (isHLS && !hlsSupported) {
+    // HLS не поддерживается браузером
+    alert('HLS потоки (m3u8) не поддерживаются в этом браузере.\n\nПопробуйте использовать другой поток или обновить браузер.');
+    state.isSwitching = false;
+    return;
+  }
+  
+  // Инициализировать эквалайзер если он включен
+  if (equalizerEnabled) {
+    if (!state.equalizer) {
+      state.equalizer = new window.Equalizer();
+    }
+    
+    // Отключить старый эквалайзер если есть
+    state.equalizer.disconnect();
+    
+    // Инициализировать с новым аудио элементом
+    // Важно: это должно быть сделано ПОСЛЕ установки crossOrigin, но ДО установки src
+    // Но init будет вызван после установки src, поэтому crossOrigin уже установлен
+  }
+  
+  // Установить источник напрямую (только если не HLS, для HLS источник устанавливается через hls.loadSource)
+  if (!useHLS) {
+    // Для потоков без расширения браузер сам определит формат по заголовкам
+    // Для MP3 потоков убедимся, что URL правильно обработан
+    if (contentType === 'audio/mpeg') {
+      // Для MP3 потоков убедимся, что URL не содержит проблемных символов
+      // и правильно закодирован
+      try {
+        const urlObj = new URL(streamUrl);
+        // Если URL валидный, используем его как есть
+        audioElement.src = streamUrl;
+      } catch (e) {
+        // Если URL невалидный, попробуем использовать как есть (может быть относительный)
+        audioElement.src = streamUrl;
+      }
+    } else {
+      audioElement.src = streamUrl;
+    }
+  }
+  
+  // Инициализировать эквалайзер ПОСЛЕ установки src (но crossOrigin уже установлен выше)
+  if (equalizerEnabled && state.equalizer) {
+    // Инициализировать с новым аудио элементом
+    if (state.equalizer.init(audioElement)) {
+      // Применить сохраненные настройки
+      if (state.settings.equalizer.values) {
+        state.equalizer.setValues(state.settings.equalizer.values);
+      }
+      if (state.settings.equalizer.preset) {
+        state.equalizer.setPreset(state.settings.equalizer.preset);
+      }
+    }
+  }
+  
+  // Общее состояние повторных попыток (нужно обработчику ошибок и handleStalled)
+  const retryState = { retryCount: 0, maxRetries: 2, terminalErrorPending: false };
+  
+  bindAudioElementEvents({ station, streamUrl, audioElement, contentType, useCrossfade, crossfadeDuration, oldAudio, retryState });
   
   // Сохранить ссылку на элемент
   state.audio = audioElement;
