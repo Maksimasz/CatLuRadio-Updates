@@ -107,7 +107,10 @@ namespace CatLuRadio
                     : "WebView2: фиксированный рантайм " + Path.GetFileName(fixedRuntime));
                 var env = await CoreWebView2Environment.CreateAsync(
                     browserExecutableFolder: fixedRuntime,
-                    userDataFolder: Path.Combine(dataPath, "WebView2"));
+                    // Профиль тоже разделяем со старой версией: WebView2 блокирует
+                    // userDataFolder на время работы, и без разделения вторая
+                    // копия не смогла бы запуститься одновременно с первой.
+                    userDataFolder: Path.Combine(dataPath, "WebView2-v2"));
                 await webView.EnsureCoreWebView2Async(env);
                 webView.CoreWebView2.Settings.IsWebMessageEnabled = true;
                 webView.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = true;
