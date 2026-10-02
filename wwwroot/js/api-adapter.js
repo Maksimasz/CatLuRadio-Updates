@@ -75,6 +75,15 @@ if (window.chrome && window.chrome.webview) {
     console.error('[WebView2 API] WebView2 не доступен!');
 }
 
+// Ответ хоста приходит уже разобранным объектом (resultRaw). Раньше в
+// диалогах и файловых операциях стоял голый JSON.parse(result), который для
+// объекта бросает SyntaxError "[object Object]" — и catch возвращал
+// «диалог отменён». Из-за этого импорт и экспорт станций не работали:
+// диалог всегда считался закрытым, а чтение/запись файла давали null/false.
+function asNativeObject(result) {
+    return typeof result === 'string' ? JSON.parse(result) : result;
+}
+
 const WebView2API = {
     async get(key, defaultValue = null) {
         try {
@@ -125,38 +134,53 @@ const WebView2API = {
 
     async showOpenDialog() {
         try {
-            const result = await sendToNative('showOpenDialog');
-            return JSON.parse(result);
+            const response = asNativeObject(await sendToNative('showOpenDialog'));
+            return response?.Success
+                ? { canceled: false, filePaths: response.Data ?? [] }
+                : { canceled: true, filePaths: [] };
         } catch (e) {
+            console.error('[WebView2 API] Ошибка диалога открытия:', e);
             return { canceled: true, filePaths: [] };
         }
     },
 
     async showSaveDialog(options = {}) {
         try {
-            const result = await sendToNative('showSaveDialog', { 
-                defaultPath: options.defaultPath || 'file.json' 
-            });
-            return JSON.parse(result);
+            const response = asNativeObject(await sendToNative('showSaveDialog', {
+                defaultPath: options.defaultPath || 'file.json'
+            }));
+            return response?.Success
+                ? { canceled: false, filePath: response.FilePath ?? null }
+                : { canceled: true, filePath: null };
         } catch (e) {
+            console.error('[WebView2 API] Ошибка диалога сохранения:', e);
             return { canceled: true, filePath: null };
         }
     },
 
     async readFile(path) {
         try {
-            const result = await sendToNative('readFile', { path });
-            const parsed = JSON.parse(result);
-            return parsed.success ? parsed.content : null;
+            const response = asNativeObject(await sendToNative('readFile', { path }));
+            // В ответе C# поле называется Content, а не content.
+            if (!response?.Success) {
+                console.error('[WebView2 API] readFile отклонён:', response?.Error ?? response?.error ?? 'нет доступа');
+                return null;
+            }
+            return response.Content ?? '';
         } catch (e) {
+            console.error('[WebView2 API] Ошибка чтения файла:', e);
             return null;
         }
     },
 
     async writeFile(path, content) {
         try {
-            const result = await sendToNative('writeFile', { path, content });
-            return JSON.parse(result).success;
+            const response = asNativeObject(await sendToNative('writeFile', { path, content }));
+            if (!response?.Success) {
+                console.error('[WebView2 API] writeFile отклонён:', response?.Error ?? response?.error ?? 'нет доступа');
+                return false;
+            }
+            return true;
         } catch (e) {
             return false;
         }

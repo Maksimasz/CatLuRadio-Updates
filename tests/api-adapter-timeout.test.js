@@ -103,6 +103,52 @@ function reply(resultRaw) {
     const stations = await parsed;
     assert.strictEqual(stations.a, 1, 'get() не распарсил JSON из хранилища');
 
+    // 8. Диалог сохранения: успех -> { canceled: false, filePath }.
+    // Регрессия: раньше стоял JSON.parse(объекта), он бросал SyntaxError,
+    // и catch возвращал canceled:true — экспорт станций не работал вовсе.
+    const saveDialog = vm.runInContext('WebView2API.showSaveDialog({ defaultPath: "x.json" })', sandbox);
+    assert.strictEqual(lastRequest().action, 'showSaveDialog', 'диалог не дошёл до хоста');
+    reply({ Success: true, FilePath: 'D:\\radio\\out.json' });
+    const saved = await saveDialog;
+    assert.strictEqual(saved.canceled, false, 'диалог сохранения отменён без причины');
+    assert.strictEqual(saved.filePath, 'D:\\radio\\out.json', 'путь из диалога потерян');
+
+    // 9. Диалог сохранения: отмена пользователем.
+    const canceledSave = vm.runInContext('WebView2API.showSaveDialog()', sandbox);
+    reply({ Success: false });
+    assert.strictEqual((await canceledSave).canceled, true, 'отмена не распознана');
+
+    // 10. Диалог открытия: путь лежит в Data[], а не в filePaths.
+    const openDialog = vm.runInContext('WebView2API.showOpenDialog()', sandbox);
+    reply({ Success: true, Data: ['D:\\radio\\in.json'] });
+    const opened = await openDialog;
+    assert.strictEqual(opened.canceled, false, 'диалог открытия отменён без причины');
+    assert.strictEqual(JSON.stringify(opened.filePaths), JSON.stringify(['D:\\radio\\in.json']),
+        'путь из Data не переименован в filePaths');
+
+    // 11. Чтение файла: поле ответа называется Content (не content).
+    const read = vm.runInContext('WebView2API.readFile("/data/store_v2.json")', sandbox);
+    reply({ Success: true, Content: '{"a":1}' });
+    assert.strictEqual(await read, '{"a":1}', 'содержимое файла не прочитано');
+
+    // 12. Отказ в доступе к файлу -> null, а не падение.
+    const deniedRead = vm.runInContext('WebView2API.readFile("/Windows/win.ini")', sandbox);
+    reply({ Success: false, Error: 'Доступ запрещён' });
+    assert.strictEqual(await deniedRead, null, 'отказ в чтении не вернул null');
+
+    // 13. Запись файла: успех и отказ.
+    const writeOk = vm.runInContext('WebView2API.writeFile("/data/x.json", "{}")', sandbox);
+    reply({ Success: true });
+    assert.strictEqual(await writeOk, true, 'успешная запись вернула false');
+    const writeDenied = vm.runInContext('WebView2API.writeFile("/Windows/x.json", "{}")', sandbox);
+    reply({ Success: false, Error: 'Доступ запрещён' });
+    assert.strictEqual(await writeDenied, false, 'отказ в записи вернул true');
+
+    // 14. Ответ хоста, в котором нет поля Success, не считается успехом.
+    const noFlag = vm.runInContext('WebView2API.writeFile("/data/x.json", "{}")', sandbox);
+    reply({});
+    assert.strictEqual(await noFlag, false, 'ответ без Success принят за успех');
+
     console.log('API adapter bridge: OK');
 })().catch(error => {
     console.error(error);
