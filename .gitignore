@@ -22,3 +22,5 @@ WebView2Runtime/
 *.log
 Thumbs.db
 Desktop.ini
+# --- Отчёты инструментов (генерируются локально) ---
+tools/stations-report.json
