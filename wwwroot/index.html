@@ -96,7 +96,7 @@
     </div>
 
     <div class="tab-content" id="search-tab">
-      <div class="search-box">
+      <div class="search-box online-search-bar">
         <select id="onlinePortalSelect" aria-label="Портал">
           <option value="all">Все порталы</option>
           <option value="radio-browser">Radio Browser</option>
@@ -108,7 +108,7 @@
           <option value="radijo-stotys">Radijo-stotys.lt</option>
         </select>
         <input type="text" id="onlineSearchInput" placeholder="Название, стиль, исполнитель или годы">
-        <select id="onlineCountrySelect">
+        <select id="onlineCountrySelect" aria-label="Страна">
           <option value="all">Все страны</option>
           <optgroup label="СНГ">
             <option value="RU">Россия</option><option value="AM">Армения</option><option value="AZ">Азербайджан</option><option value="BY">Беларусь</option><option value="KZ">Казахстан</option><option value="KG">Кыргызстан</option><option value="MD">Молдова</option><option value="TJ">Таджикистан</option><option value="TM">Туркменистан</option><option value="UZ">Узбекистан</option>
@@ -119,11 +119,9 @@
           <option value="US">США</option>
           <option value="IL">Израиль</option>
         </select>
-      </div>
-      <div class="online-search-action">
-        <button id="onlineSearchBtn" class="btn btn-primary">🌐 Найти в интернете</button>
-        <button id="clearOnlineSearchBtn" class="btn btn-secondary">× Очистить</button>
-        <button id="backToStationsBtn" class="btn btn-secondary">← К станциям</button>
+        <button id="onlineSearchBtn" class="btn btn-primary" title="Найти в интернете">🌐 Найти</button>
+        <button id="clearOnlineSearchBtn" class="btn btn-secondary" title="Очистить">✕</button>
+        <button id="backToStationsBtn" class="btn btn-secondary" title="К станциям">←</button>
       </div>
       <div id="onlineResults" class="online-results" hidden></div>
     </div>

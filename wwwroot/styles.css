@@ -169,11 +169,12 @@ body {
 .controls {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  row-gap: 8px;
-  gap: 10px;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-top: 12px; /* отступ от названия CatLu Radio */
   position: relative;
   z-index: 1;
+  min-width: 0;
 }
 
 /* Windows 11 Buttons */
@@ -314,15 +315,16 @@ body {
 .volume-control {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-left: auto;
-  background: transparent;
+  gap: 8px;
+  flex: 1 1 auto;
+  margin-left: 0;
   padding: 6px 12px;
   border-radius: var(--radius-btn);
   backdrop-filter: none;
   border: 1px solid var(--card-border);
   color: var(--md-on-surface);
   transition: border-color 0.1s ease;
+  min-width: 0;
 }
 
 .volume-control:hover {
@@ -336,7 +338,9 @@ body {
 }
 
 .volume-control input[type="range"] {
-  width: 100px;
+  flex: 1 1 60px;
+  width: auto;
+  min-width: 50px;
   accent-color: var(--md-primary);
   cursor: pointer;
   height: 4px;
@@ -1328,9 +1332,6 @@ body {
   transform: none;
 }
 
-.online-search-action { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-.online-search-action .btn { min-height: 30px; padding: 6px 14px; text-transform: none; letter-spacing: .2px; }
-.online-search-action .btn:first-child { flex: 1 1 auto; }
 .station-health { display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 11px; }
 .station-health a { color: var(--md-primary); text-decoration: none; border-bottom: 1px dotted currentColor; }
 .station-health a:hover { color: var(--md-secondary); }
@@ -1613,6 +1614,43 @@ body {
   }
 }
 
+/* ── Вкладка «Станции»: только перечень сохранённых станций ──────────────── */
+#stations-tab .search-box {
+  display: none;
+}
+
+/* ── Вкладка «Поиск»: компактная строка — портал, ввод, страна, кнопки ───── */
+.online-search-bar {
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.online-search-bar select,
+.online-search-bar input {
+  flex: 1 1 70px;
+  min-width: 60px;
+  padding: 6px 8px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.online-search-bar #onlineSearchInput {
+  flex: 2 1 110px;
+}
+
+.online-search-bar .btn {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 6px 8px;
+  font-size: 12.5px;
+}
+
+.online-search-bar input:focus,
+.online-search-bar select:focus {
+  padding: 5px 7px;
+}
+
 /* ── Адаптивность: интерфейс не выходит за границы окна ────────────────── */
 @media (max-width: 900px) {
   .header {
@@ -1634,17 +1672,13 @@ body {
     font-size: 12.5px;
   }
 
-  .search-box input,
-  .search-box select,
-  .form-group input[type="text"],
-  .form-group select {
-    flex: 1 1 100%;
+  .controls {
+    gap: 6px;
   }
 
   .volume-control {
-    width: 100%;
-    justify-content: center;
-    margin-left: 0;
+    padding: 6px 8px;
+    gap: 6px;
   }
 
   .now-playing-info {
