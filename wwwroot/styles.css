@@ -1,53 +1,102 @@
-/* Material Design Variables */
+/* Windows 11 (Fluent Design) Variables */
 :root {
   /* Light theme */
   --md-primary: #6f7b4b;
-  --md-primary-variant: #79563d;
+  --md-primary-variant: #5c663e;
   --md-secondary: #a8794f;
-  --md-background: #f3eee4;
-  --md-surface: #fffaf0;
-  --md-error: #b00020;
+  --md-background: #f3f3f3;
+  --md-surface: #f9f9f9;
+  --md-error: #c42b1c;
   --md-on-primary: #ffffff;
   --md-on-secondary: #000000;
-  --md-on-background: #000000;
-  --md-on-surface: #000000;
+  --md-on-background: #1b1b1b;
+  --md-on-surface: #1b1b1b;
   --md-on-error: #ffffff;
-  --md-shadow: rgba(0, 0, 0, 0.2);
-  --md-elevation-1: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-  --md-elevation-2: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
-  --md-elevation-4: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+  --md-shadow: rgba(0, 0, 0, 0.16);
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --md-elevation-2: 0 2px 6px rgba(0, 0, 0, 0.09);
+  --md-elevation-4: 0 8px 24px rgba(0, 0, 0, 0.14);
+
+  /* Fluent-производные */
+  --card-bg: #ffffff;
+  --card-border: #e5e5e5;
+  --hover-tint: rgba(0, 0, 0, 0.045);
+  --subtle-text: rgba(0, 0, 0, 0.6);
+  --accent-tint: rgba(111, 123, 75, 0.10);
+  --radius-card: 8px;
+  --radius-btn: 6px;
+
+  /* Material-имена, используемые в разметке ниже */
+  --md-outline: #e0e0e0;
+  --md-outline-variant: #ebebeb;
+  --md-on-surface-variant: rgba(0, 0, 0, 0.6);
+  --md-surface-container-low: #f6f6f6;
+  --md-surface-container: #ededed;
+  --md-surface-container-highest: #e6e6e6;
 }
 
 [data-theme="dark"] {
   --md-primary: #9aaa72;
-  --md-primary-variant: #76543d;
+  --md-primary-variant: #b2c489;
   --md-secondary: #c49a6c;
-  --md-background: #17140f;
-  --md-surface: #211d17;
-  --md-error: #cf6679;
-  --md-on-primary: #000000;
+  --md-background: #202020;
+  --md-surface: #272727;
+  --md-error: #ff99a4;
+  --md-on-primary: #0d1405;
   --md-on-secondary: #000000;
   --md-on-background: #ffffff;
   --md-on-surface: #ffffff;
   --md-on-error: #000000;
   --md-shadow: rgba(0, 0, 0, 0.5);
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --md-elevation-2: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --md-elevation-4: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  --card-bg: #2b2b2b;
+  --card-border: #3a3a3a;
+  --hover-tint: rgba(255, 255, 255, 0.06);
+  --subtle-text: rgba(255, 255, 255, 0.6);
+  --accent-tint: rgba(154, 170, 114, 0.14);
+
+  --md-outline: #3a3a3a;
+  --md-outline-variant: #353535;
+  --md-on-surface-variant: rgba(255, 255, 255, 0.6);
+  --md-surface-container-low: #2f2f2f;
+  --md-surface-container: #333333;
+  --md-surface-container-highest: #3a3a3a;
 }
 
 /* Улучшение контрастности для системной темы */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     --md-primary: #9aaa72;
-    --md-primary-variant: #76543d;
+    --md-primary-variant: #b2c489;
     --md-secondary: #c49a6c;
-    --md-background: #17140f;
-    --md-surface: #211d17;
-    --md-error: #cf6679;
-    --md-on-primary: #000000;
+    --md-background: #202020;
+    --md-surface: #272727;
+    --md-error: #ff99a4;
+    --md-on-primary: #0d1405;
     --md-on-secondary: #000000;
     --md-on-background: #ffffff;
     --md-on-surface: #ffffff;
     --md-on-error: #000000;
     --md-shadow: rgba(0, 0, 0, 0.5);
+    --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --md-elevation-2: 0 2px 6px rgba(0, 0, 0, 0.35);
+    --md-elevation-4: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+    --card-bg: #2b2b2b;
+    --card-border: #3a3a3a;
+    --hover-tint: rgba(255, 255, 255, 0.06);
+    --subtle-text: rgba(255, 255, 255, 0.6);
+    --accent-tint: rgba(154, 170, 114, 0.14);
+
+    --md-outline: #3a3a3a;
+    --md-outline-variant: #353535;
+    --md-on-surface-variant: rgba(255, 255, 255, 0.6);
+    --md-surface-container-low: #2f2f2f;
+    --md-surface-container: #333333;
+    --md-surface-container-highest: #3a3a3a;
   }
 }
 
@@ -58,7 +107,7 @@
 }
 
 body {
-  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
   background: var(--md-background);
   color: var(--md-on-background);
   overflow: hidden;
@@ -81,12 +130,13 @@ body {
   background: var(--md-background);
 }
 
-/* Header - Material Design */
+/* Header - Windows 11 Fluent */
 .header {
-  background: linear-gradient(135deg, var(--md-primary) 0%, var(--md-primary-variant) 100%);
-  color: var(--md-on-primary);
-  padding: 16px 24px;
-  box-shadow: var(--md-elevation-4);
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--card-border);
+  box-shadow: none;
   z-index: 10;
   position: relative;
   overflow: hidden;
@@ -95,27 +145,18 @@ body {
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
-}
-
-.header::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
-  pointer-events: none;
+  flex-shrink: 0;
 }
 
 .header h1 {
-  font-size: 20px;
+  font-size: 17px;
   margin: 0;
   font-weight: 600;
-  letter-spacing: 0.5px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  letter-spacing: 0;
+  text-shadow: none;
   position: relative;
   z-index: 1;
+  color: var(--md-on-surface);
 }
 
 .clock {
@@ -128,127 +169,101 @@ body {
 .controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 8px;
   gap: 10px;
   position: relative;
   z-index: 1;
 }
 
-/* Material Design Buttons */
+/* Windows 11 Buttons */
 .btn {
   border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 7px 14px;
+  border-radius: var(--radius-btn);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: var(--md-elevation-2);
-  min-height: 36px;
-  min-width: 36px;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0.1px;
+  transition: background-color 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+  box-shadow: none;
+  min-height: 32px;
+  min-width: 32px;
   outline: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  overflow: hidden;
-}
-
-.btn::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
-}
-
-.btn:hover::before {
-  width: 300px;
-  height: 300px;
+  white-space: nowrap;
 }
 
 .btn:hover {
-  box-shadow: var(--md-elevation-4);
-  transform: translateY(-2px) scale(1.02);
+  box-shadow: none;
+  transform: none;
 }
 
 .btn:active {
-  box-shadow: var(--md-elevation-1);
-  transform: translateY(0) scale(0.98);
-  transition: all 0.1s;
-}
-
-.btn svg {
-  position: relative;
-  z-index: 1;
+  transform: none;
+  transition: none;
 }
 
 /* Кнопки в header */
 .header .btn-primary {
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--md-primary);
   color: var(--md-on-primary);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid transparent;
 }
 
 .header .btn-primary:hover {
-  background: rgba(255, 255, 255, 0.35);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--md-primary-variant);
 }
 
 .header .btn-secondary {
-  background: rgba(255, 255, 255, 0.2);
-  color: var(--md-on-primary);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: var(--md-on-surface);
+  border: 1px solid var(--card-border);
 }
 
 .header .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: var(--hover-tint);
+  border-color: var(--md-primary);
 }
 
 .header .btn-exit {
-  background: rgba(255, 87, 87, 0.25);
-  color: var(--md-on-primary);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 87, 87, 0.3);
-  padding: 8px;
-  min-width: 36px;
+  background: transparent;
+  color: var(--md-error);
+  border: 1px solid var(--card-border);
+  padding: 7px;
+  min-width: 32px;
 }
 
 .header .btn-exit:hover {
-  background: rgba(255, 87, 87, 0.4);
-  border-color: rgba(255, 87, 87, 0.5);
-  transform: translateY(-2px) scale(1.05) rotate(90deg);
+  background: rgba(196, 43, 28, 0.08);
+  border-color: var(--md-error);
+  transform: none;
 }
 
 .header .btn-exit:active {
-  transform: translateY(0) scale(0.95) rotate(90deg);
+  transform: none;
 }
 
 .header .btn-icon {
-  background: rgba(255, 255, 255, 0.2);
-  color: var(--md-on-primary);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  padding: 8px;
+  background: transparent;
+  color: var(--md-on-surface);
+  border: 1px solid var(--card-border);
+  padding: 7px;
 }
 
 .header .btn-icon:hover {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
+  background: var(--hover-tint);
+  border-color: var(--md-primary);
+  transform: none;
 }
 
 .header .btn-icon:active {
-  transform: translateY(0) scale(0.95);
+  transform: none;
 }
 
 /* Кнопки в формах (на светлом/темном фоне) - не в header */
@@ -274,9 +289,9 @@ body {
 .import-export-buttons .btn-secondary,
 .add-station-form .btn-secondary,
 .settings-form .btn-secondary {
-  background: var(--md-surface);
+  background: var(--card-bg);
   color: var(--md-on-surface);
-  border: 1px solid rgba(0, 0, 0, 0.23);
+  border: 1px solid var(--card-border);
 }
 
 [data-theme="dark"] .tab-content .btn-secondary,
@@ -284,7 +299,7 @@ body {
 [data-theme="dark"] .import-export-buttons .btn-secondary,
 [data-theme="dark"] .add-station-form .btn-secondary,
 [data-theme="dark"] .settings-form .btn-secondary {
-  border-color: rgba(255, 255, 255, 0.23);
+  border-color: var(--card-border);
 }
 
 .tab-content .btn-secondary:hover,
@@ -292,15 +307,8 @@ body {
 .import-export-buttons .btn-secondary:hover,
 .add-station-form .btn-secondary:hover,
 .settings-form .btn-secondary:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-[data-theme="dark"] .tab-content .btn-secondary:hover,
-[data-theme="dark"] .form-buttons .btn-secondary:hover,
-[data-theme="dark"] .import-export-buttons .btn-secondary:hover,
-[data-theme="dark"] .add-station-form .btn-secondary:hover,
-[data-theme="dark"] .settings-form .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--hover-tint);
+  border-color: var(--md-primary);
 }
 
 .volume-control {
@@ -308,17 +316,18 @@ body {
   align-items: center;
   gap: 10px;
   margin-left: auto;
-  background: rgba(255, 255, 255, 0.2);
-  padding: 8px 16px;
-  border-radius: 24px;
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  transition: all 0.3s ease;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: var(--radius-btn);
+  backdrop-filter: none;
+  border: 1px solid var(--card-border);
+  color: var(--md-on-surface);
+  transition: border-color 0.1s ease;
 }
 
 .volume-control:hover {
-  background: rgba(255, 255, 255, 0.25);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: var(--hover-tint);
+  border-color: var(--md-primary);
 }
 
 .volume-control svg {
@@ -328,7 +337,7 @@ body {
 
 .volume-control input[type="range"] {
   width: 100px;
-  accent-color: white;
+  accent-color: var(--md-primary);
   cursor: pointer;
   height: 4px;
 }
@@ -346,41 +355,45 @@ body {
   font-weight: 600;
 }
 
-/* Material Design Tabs - улучшенный стиль */
+/* Windows 11 Tabs - Pivot style */
 .tabs {
   display: flex;
   background: var(--md-surface);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--card-border);
+  box-shadow: none;
   position: relative;
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   min-width: 0;
+  flex-shrink: 0;
+  scrollbar-width: none;
 }
 
-[data-theme="dark"] .tabs {
-  border-bottom-color: rgba(255, 255, 255, 0.12);
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-btn {
-  flex: 1;
-  padding: 14px 16px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 12px 12px;
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
-  color: rgba(0, 0, 0, 0.6);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+  color: var(--subtle-text);
+  transition: background-color 0.1s ease, color 0.1s ease;
   border-bottom: 3px solid transparent;
   position: relative;
   text-transform: none;
   letter-spacing: 0;
-}
-
-[data-theme="dark"] .tab-btn {
-  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tab-btn::before {
@@ -391,26 +404,38 @@ body {
   width: 0;
   height: 3px;
   background: var(--md-primary);
+  border-radius: 3px 3px 0 0;
   transform: translateX(-50%);
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .tab-btn:hover {
-  background: rgba(0, 0, 0, 0.04);
-  color: var(--md-primary);
-}
-
-[data-theme="dark"] .tab-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--hover-tint);
+  color: var(--md-on-surface);
 }
 
 .tab-btn.active {
-  color: var(--md-primary);
+  color: var(--md-on-surface);
   font-weight: 600;
 }
 
 .tab-btn.active::before {
-  width: 60%;
+  width: 50%;
+}
+
+/* Вкладка-иконка (⚙ Настройки) */
+.tab-btn-icon {
+  flex: 0 0 auto;
+  min-width: 44px;
+  padding: 10px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.tab-btn-icon svg {
+  display: block;
 }
 
 .tab-content {
@@ -429,9 +454,10 @@ body {
   flex-direction: column;
 }
 
-/* Material Design Form Elements */
+/* Windows 11 Form Elements */
 .search-box {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 8px;
   width: 100%;
@@ -444,21 +470,23 @@ body {
 .search-box select,
 .form-group input[type="text"],
 .form-group select {
-  flex: 1;
+  flex: 1 1 200px;
+  min-width: 150px;
   padding: 8px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.23);
-  border-radius: 4px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-btn);
   font-size: 14px;
-  background: var(--md-surface);
+  font-family: inherit;
+  background: var(--card-bg);
   color: var(--md-on-surface);
-  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.1s ease;
 }
 
 [data-theme="dark"] .search-box input,
 [data-theme="dark"] .search-box select,
 [data-theme="dark"] .form-group input[type="text"],
 [data-theme="dark"] .form-group select {
-  border-color: rgba(255, 255, 255, 0.23);
+  border-color: var(--card-border);
 }
 
 .search-box input:focus,
@@ -473,6 +501,7 @@ body {
 
 .import-export-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
 }
@@ -516,78 +545,97 @@ body {
   color: rgba(255, 255, 255, 0.6);
 }
 
-/* Material Design Stations List */
+/* Windows 11 Stations List */
 .stations-list {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 .station-item {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  margin-bottom: 4px;
-  background: var(--md-surface);
-  border-radius: 4px;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  box-shadow: var(--md-elevation-1);
-}
-
-[data-theme="dark"] .station-item {
-  border-color: rgba(255, 255, 255, 0.12);
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+  border: 1px solid var(--card-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  min-width: 0;
 }
 
 .station-item:hover {
-  background: rgba(0, 0, 0, 0.04);
-  box-shadow: var(--md-elevation-2);
-  transform: translateY(-2px);
-}
-
-[data-theme="dark"] .station-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--hover-tint);
+  box-shadow: var(--md-elevation-1);
+  transform: none;
 }
 
 .station-item.playing {
-  background: rgba(98, 0, 238, 0.08);
+  background: var(--accent-tint);
   border-color: var(--md-primary);
-  box-shadow: var(--md-elevation-2);
-}
-
-[data-theme="dark"] .station-item.playing {
-  background: rgba(187, 134, 252, 0.16);
+  box-shadow: none;
 }
 
 .station-info {
   flex: 1;
+  min-width: 0;
 }
 
 .station-name {
-  font-weight: 500;
+  font-weight: 600;
   font-size: 14px;
   color: var(--md-on-surface);
-  margin-bottom: 2px;
-  letter-spacing: 0.15px;
+  margin-bottom: 1px;
+  letter-spacing: 0;
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Строка под названием: имя портала строчными (+ время в истории) */
+.station-sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--subtle-text);
+  letter-spacing: 0.25px;
+  line-height: 1.3;
+  text-transform: lowercase;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.station-sub > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.station-time {
+  flex: none;
+  font-size: 11px;
+  opacity: 0.8;
 }
 
 .station-meta {
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--subtle-text);
   display: flex;
   gap: 6px;
   letter-spacing: 0.25px;
   line-height: 1.2;
 }
 
-[data-theme="dark"] .station-meta {
-  color: rgba(255, 255, 255, 0.6);
-}
-
 .station-actions {
   display: flex;
-  gap: 8px;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .btn-icon {
@@ -596,23 +644,20 @@ body {
   cursor: pointer;
   font-size: 16px;
   padding: 4px;
-  border-radius: 50%;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  width: 28px;
-  height: 28px;
+  border-radius: var(--radius-btn);
+  transition: background-color 0.1s ease, color 0.1s ease;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: none;
+  color: var(--md-on-surface);
 }
 
 .btn-icon:hover {
-  background: rgba(0, 0, 0, 0.08);
-  box-shadow: var(--md-elevation-2);
-}
-
-[data-theme="dark"] .btn-icon:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--hover-tint);
+  box-shadow: none;
 }
 
 .btn-favorite {
@@ -656,6 +701,7 @@ body {
 
 .form-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
 }
@@ -683,11 +729,11 @@ body {
 .form-group label {
   display: block;
   margin-bottom: 8px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--md-on-surface);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .form-group input[type="checkbox"] {
@@ -743,18 +789,14 @@ body {
 .now-playing {
   background: var(--md-surface);
   padding: 8px 16px;
-  border-top: 1px solid rgba(0, 0, 0, 0.12);
-  box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+  border-top: 1px solid var(--card-border);
+  box-shadow: none;
   flex-shrink: 0;
   min-height: auto;
   overflow: hidden;
   position: relative;
   z-index: 10;
   order: 999;
-}
-
-[data-theme="dark"] .now-playing {
-  border-top-color: rgba(255, 255, 255, 0.12);
 }
 
 .now-playing-info {
@@ -812,30 +854,30 @@ body {
 }
 
 
-/* Material Design Scrollbar */
+/* Windows 11 Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 12px;
+  height: 12px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--md-surface);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 4px;
-}
-
-[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(127, 127, 127, 0.35);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(127, 127, 127, 0.6);
+  background-clip: content-box;
 }
 
-[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Loading animation */
@@ -851,30 +893,6 @@ body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-/* Ripple effect for Material Design */
-.btn {
-  position: relative;
-  overflow: hidden;
-}
-
-.btn::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
-  transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
-}
-
-.btn:active::after {
-  width: 300px;
-  height: 300px;
 }
 
 /* Эквалайзер */
@@ -1002,6 +1020,8 @@ body {
 
 .history-header {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 15px;
@@ -1027,17 +1047,37 @@ body {
 .country-group {
   margin-bottom: 8px;
   border: 1px solid var(--md-outline-variant);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   overflow: hidden;
+  background: var(--card-bg);
 }
 
 .country-group summary {
   display: flex;
   justify-content: space-between;
-  padding: 10px 12px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
   cursor: pointer;
   background: var(--md-surface-container-low);
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--md-on-surface);
+  transition: background-color 0.1s ease;
+}
+
+.country-group summary:hover {
+  background: var(--hover-tint);
+}
+
+.country-group summary span {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--md-primary);
+  background: var(--accent-tint);
+  border-radius: 10px;
+  padding: 1px 9px;
+  flex-shrink: 0;
 }
 
 /* Аккордеоны для настроек */
@@ -1211,10 +1251,11 @@ body {
   left: 0;
   right: 0;
   width: 100%;
-  background: linear-gradient(135deg, var(--md-primary) 0%, var(--md-primary-variant) 100%);
-  color: var(--md-on-primary);
+  background: var(--md-surface);
+  color: var(--md-on-surface);
   padding: 10px 16px;
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  border-top: 1px solid var(--card-border);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.12);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -1242,11 +1283,11 @@ body {
 
 .mini-player-station {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: none;
 }
 
 .mini-player-time {
@@ -1263,48 +1304,159 @@ body {
 }
 
 .btn-mini {
-  border: none;
+  border: 1px solid var(--card-border);
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-btn);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.1s ease, border-color 0.1s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 32px;
   min-height: 32px;
   outline: none;
-  background: rgba(255, 255, 255, 0.2);
-  color: var(--md-on-primary);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: var(--md-on-surface);
 }
 
 .btn-mini:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-1px);
+  background: var(--hover-tint);
+  transform: none;
 }
 
 .btn-mini:active {
-  transform: translateY(0);
+  transform: none;
 }
 
-.online-search-action { display: flex; gap: 8px; margin-bottom: 10px; }
-.online-search-action .btn { min-height: 28px; padding: 5px 12px; text-transform: none; letter-spacing: .2px; }
-.online-search-action .btn:first-child { flex: 1; }
+.online-search-action { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.online-search-action .btn { min-height: 30px; padding: 6px 14px; text-transform: none; letter-spacing: .2px; }
+.online-search-action .btn:first-child { flex: 1 1 auto; }
 .station-health { display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 11px; }
 .station-health a { color: var(--md-primary); text-decoration: none; border-bottom: 1px dotted currentColor; }
 .station-health a:hover { color: var(--md-secondary); }
 .station-health a[aria-disabled="true"] { opacity: .55; pointer-events: none; }
 #stationCheckStatus { color: var(--md-on-surface); opacity: .65; font-size: 11px; }
 .station-item.offline { opacity: .45; cursor: pointer; }
-.station-item.offline .station-name::after { content: " — недоступна"; color: #ef5350; font-size: 11px; }
-.online-results { margin: 0 0 10px; padding: 10px; border: 1px solid rgba(128, 112, 88, .45); border-radius: 8px; max-height: 220px; overflow-y: auto; }
-.online-result { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--md-outline); }
-.online-result > span { flex: 1; min-width: 0; }
-.online-result-actions { display: flex; gap: 6px; flex-shrink: 0; }
-.online-result-actions .btn { min-height: 28px; padding: 5px 10px; font-size: 11px; text-transform: none; letter-spacing: 0; }
+.station-item.offline .station-name::after { content: " — недоступна"; color: var(--md-error); font-size: 11px; }
+
+/* Результаты онлайн-поиска: кликабельная строка + кнопка «+» */
+.online-results {
+  margin: 0 0 10px;
+  padding: 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  max-height: 320px;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.online-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--md-outline);
+  transition: background-color 0.12s ease;
+  min-width: 0;
+}
+
 .online-result:last-child { border-bottom: 0; }
+
+.online-result:hover { background: var(--hover-tint); }
+
+/* Станция уже проигрывается */
+.online-result.is-playing { background: var(--accent-tint); }
+
+/* Станция уже добавлена в основной плейлист — другой цвет */
+.online-result.in-playlist { background: var(--accent-tint); }
+.online-result.in-playlist .online-result-name { color: var(--md-primary); }
+
+.online-result-info { flex: 1; min-width: 0; }
+
+.online-result-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--md-on-surface);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.online-result-sub {
+  font-size: 12px;
+  color: var(--subtle-text);
+  text-transform: lowercase;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.online-result-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Индикатор воспроизведения ▶/■ */
+.play-ind {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 11px;
+  color: var(--subtle-text);
+  transition: background-color 0.1s ease, color 0.1s ease;
+  user-select: none;
+}
+
+.online-result:hover .play-ind {
+  background: var(--hover-tint);
+  color: var(--md-primary);
+}
+
+.online-result.is-playing .play-ind {
+  color: var(--md-primary);
+  font-weight: 700;
+}
+
+/* Кнопка добавления: «+», после добавления — галочка */
+.online-add {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--md-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+}
+
+.online-add:hover {
+  background: var(--accent-tint);
+  border-color: var(--md-primary);
+}
+
+.online-add.added,
+.online-add:disabled {
+  background: var(--md-primary);
+  border-color: transparent;
+  color: var(--md-on-primary);
+  cursor: default;
+  opacity: 1;
+}
 
 .btn:disabled,
 .btn-mini:disabled {
@@ -1314,24 +1466,32 @@ body {
 }
 
 .btn-mini-primary {
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--md-primary);
+  border-color: transparent;
+  color: var(--md-on-primary);
+}
+
+.btn-mini-primary:hover {
+  background: var(--md-primary-variant);
 }
 
 .btn-mini-secondary {
-  background: rgba(255, 255, 255, 0.2);
+  background: transparent;
 }
 
 .btn-mini-icon {
-  background: rgba(255, 255, 255, 0.15);
+  background: transparent;
 }
 
 .btn-mini-exit {
-  background: rgba(255, 87, 87, 0.25);
-  border-color: rgba(255, 87, 87, 0.3);
+  background: transparent;
+  color: var(--md-error);
+  border-color: var(--card-border);
 }
 
 .btn-mini-exit:hover {
-  background: rgba(255, 87, 87, 0.4);
+  background: rgba(196, 43, 28, 0.08);
+  border-color: var(--md-error);
 }
 
 .mini-volume-control {
@@ -1344,7 +1504,7 @@ body {
 .mini-volume-control input[type="range"] {
   width: 80px;
   height: 4px;
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(127, 127, 127, 0.4);
   border-radius: 2px;
   outline: none;
   -webkit-appearance: none;
@@ -1354,26 +1514,22 @@ body {
 .mini-volume-control input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 12px;
-  height: 12px;
-  background: var(--md-on-primary);
+  width: 14px;
+  height: 14px;
+  background: var(--md-primary);
   border-radius: 50%;
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .mini-volume-control input[type="range"]::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  background: var(--md-on-primary);
+  width: 14px;
+  height: 14px;
+  background: var(--md-primary);
   border-radius: 50%;
   cursor: pointer;
   border: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-[data-theme="dark"] .mini-player {
-  background: linear-gradient(135deg, var(--md-primary) 0%, var(--md-primary-variant) 100%);
 }
 
 /* ── Всплывающие уведомления (showToast в renderer.js) ─────────────────── */
@@ -1454,5 +1610,83 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .toast {
     animation: none;
+  }
+}
+
+/* ── Адаптивность: интерфейс не выходит за границы окна ────────────────── */
+@media (max-width: 900px) {
+  .header {
+    padding: 10px 14px;
+  }
+
+  .header h1 {
+    font-size: 16px;
+  }
+
+  .tab-content {
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .tab-btn {
+    padding: 12px 8px;
+    font-size: 12.5px;
+  }
+
+  .search-box input,
+  .search-box select,
+  .form-group input[type="text"],
+  .form-group select {
+    flex: 1 1 100%;
+  }
+
+  .volume-control {
+    width: 100%;
+    justify-content: center;
+    margin-left: 0;
+  }
+
+  .now-playing-info {
+    flex-wrap: wrap;
+  }
+
+  .station-health {
+    white-space: normal;
+  }
+
+  .equalizer-bands {
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  .equalizer-band {
+    min-width: 46px;
+  }
+
+  .online-result {
+    flex-wrap: wrap;
+  }
+
+  .mini-player-content {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .mini-player {
+    height: auto;
+    min-height: 70px;
+  }
+}
+
+@media (max-height: 560px) {
+  .header {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .now-playing {
+    padding-top: 6px;
+    padding-bottom: 6px;
   }
 }

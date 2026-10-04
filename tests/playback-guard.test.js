@@ -55,14 +55,18 @@ if (!adapter.includes("tagQuery.set('tag', name)") || !adapter.includes('new Map
 if (!adapter.includes('<a href="\\/station\\/') || !adapter.includes('site-map')) throw new Error('RLive не разбирает полный каталог станций');
 if (!adapter.includes("include('101ru')") || !adapter.includes("https://101.ru/radio-top")) throw new Error('101.ru не подключён к меню порталов');
 if (!adapter.includes('resolvePortalStation')) throw new Error('Для 101.ru не извлекается актуальный поток');
-if (!source.includes('results.hidden = true;\n      results.replaceChildren();')) throw new Error('Результаты поиска остаются открытыми после добавления');
+// Новый UX: после добавления строка НЕ исчезает из результатов — она
+// помечается галочкой и другим цветом, чтобы пользователь видел итог;
+// от повторного добавления защищает сверка URL с плейлистом.
+if (!source.includes("row.classList.add('in-playlist')")) throw new Error('Добавленная станция не помечается в результатах поиска');
+if (!source.includes('state.stations.some(s => s.url === url)')) throw new Error('Нет защиты от повторного добавления станции');
 if (!source.includes("document.getElementById('filterSelect').value = 'all';")) throw new Error('После добавления остаётся фильтр страны');
 if (!source.includes('<details class="country-group"') || !source.includes("group.addEventListener('toggle'")) throw new Error('Нет аккордеона станций по странам');
-if (!source.includes("getElementById('onlineSearchInput')") || !source.includes("switchTab('stations');")) throw new Error('Онлайн-поиск не вынесен в отдельную вкладку');
+if (!source.includes("getElementById('onlineSearchInput')") || !source.includes("switchTab('stations')")) throw new Error('Онлайн-поиск не вынесен в отдельную вкладку');
 if ((index.match(/<optgroup label="СНГ">/g) || []).length !== 3 || (index.match(/<optgroup label="Европа">/g) || []).length !== 3) throw new Error('Страны СНГ и Европы добавлены не во все списки');
 if (index.includes('value="UK"') || !index.includes('value="GB"')) throw new Error('Код Великобритании не совместим с Radio Browser');
 if (!index.includes('id="onlinePortalSelect"') || !index.includes('value="all"') || !index.includes('value="101ru"') || !index.includes('value="dfm"') || !index.includes('value="maximum"') || !index.includes('value="rlive"') || !index.includes('value="radijo-stotys"') || index.includes('value="fm-lt"') || index.includes('value="radijo-lt"') || index.includes('value="radio-lt"')) throw new Error('Меню порталов содержит неверный источник');
-if (!source.includes("found.source || 'Radio Browser'")) throw new Error('Источник станции не показан в поиске');
+if (!source.includes("found.source || 'radio browser'")) throw new Error('Источник станции не показан в поиске');
 if (!index.includes('placeholder="Название, стиль, исполнитель или годы"')) throw new Error('Подсказка общего поиска не обновлена');
 if (!source.includes('onlineStationKey(station.name)') || !source.includes('backupSources.push(station)') || !source.includes('backupUrls')) throw new Error('Дубли поиска не объединяются в запасные потоки');
 if (source.includes("${found.codec || '?'} ${found.bitrate || '?'} kbps")) throw new Error('В результатах поиска остались кодек и битрейт');

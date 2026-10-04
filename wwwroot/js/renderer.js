@@ -524,12 +524,9 @@ function renderHistory() {
            data-station-id="${escapeHtml(station.id)}">
         <div class="station-info">
           <div class="station-name">${escapeHtml(station.name)}</div>
-          <div class="station-meta">
-            <span>${escapeHtml(getCountryName(station.country))}</span>
-            <span>•</span>
-            <span>${escapeHtml(station.genre)}</span>
-            <span>•</span>
-            <span style="font-size: 0.85em; color: var(--md-on-surface-variant);">${timeStr}</span>
+          <div class="station-sub">
+            <span>${escapeHtml(portalLabel(station))}</span>
+            <span class="station-time">${timeStr}</span>
           </div>
         </div>
         <div class="station-actions">
@@ -708,11 +705,7 @@ function renderStations(stations) {
          data-station-id="${escapeHtml(station.id)}">
       <div class="station-info">
         <div class="station-name">${escapeHtml(station.name)}</div>
-        <div class="station-meta">
-          <span>${escapeHtml(getCountryName(station.country))}</span>
-          <span>•</span>
-          <span>${escapeHtml(station.genre)}</span>
-        </div>
+        <div class="station-sub">${escapeHtml(portalLabel(station))}</div>
       </div>
       <div class="station-actions">
         ${isUserStation(station.id) ? `
@@ -814,11 +807,7 @@ function renderFavorites() {
          data-station-id="${escapeHtml(station.id)}">
       <div class="station-info">
         <div class="station-name">${escapeHtml(station.name)}</div>
-        <div class="station-meta">
-          <span>${escapeHtml(getCountryName(station.country))}</span>
-          <span>•</span>
-          <span>${escapeHtml(station.genre)}</span>
-        </div>
+        <div class="station-sub">${escapeHtml(portalLabel(station))}</div>
       </div>
       <div class="station-actions">
         ${isUserStation(station.id) ? `
@@ -1847,9 +1836,12 @@ function updatePlayButton() {
   }
 
   const hasAudio = Boolean(state.audio || state.nativeAudio);
-  document.querySelectorAll('[data-preview-id]').forEach(button => {
-    const active = state.currentStation?.id === button.dataset.previewId && hasAudio;
-    button.textContent = active ? '■ Остановить' : '▶ Прослушать';
+  const playingId = hasAudio && state.currentStation ? state.currentStation.id : null;
+  document.querySelectorAll('[data-preview-id]').forEach(el => {
+    const active = playingId !== null && el.dataset.previewId === playingId;
+    el.classList.toggle('is-playing', active);
+    const ind = el.querySelector('.play-ind');
+    if (ind) ind.textContent = active ? '■' : '▶';
   });
   if (btn) btn.disabled = !hasAudio;
   if (stopBtn) stopBtn.disabled = !hasAudio;
@@ -2019,6 +2011,15 @@ function getCountryName(code) {
   return code;
 }
 
+// «Имя портала» станции — строка под названием, всегда строчными буквами.
+// Хранится в station.source (добавлено из онлайн-поиска); для станций,
+// живущих в локальном списке, показываем портал самого приложения.
+function portalLabel(station) {
+  const source = station && station.source ? String(station.source).trim() : '';
+  if (source) return source.toLowerCase();
+  return 'catlu radio';
+}
+
 async function checkAllStations() {
   const button = document.getElementById('checkStationsBtn');
   const status = document.getElementById('stationCheckStatus');
@@ -2105,10 +2106,6 @@ async function searchOnlineStations() {
   stations.forEach(found => {
     const row = document.createElement('div');
     row.className = 'online-result';
-    const info = document.createElement('span');
-    info.textContent = `${found.name} — ${found.source || 'Radio Browser'}`;
-    const actions = document.createElement('div');
-    actions.className = 'online-result-actions';
     const previewStation = {
       id: `preview-online-${found.stationuuid || found.name}`,
       name: found.name,
@@ -2118,37 +2115,81 @@ async function searchOnlineStations() {
       image: found.favicon || '',
       preview: true
     };
-    const preview = document.createElement('button');
-    preview.className = 'btn btn-secondary online-preview';
-    preview.dataset.previewId = previewStation.id;
-    preview.textContent = '▶ Прослушать';
-    preview.addEventListener('click', async () => {
+    row.dataset.previewId = previewStation.id;
+
+    const info = document.createElement('div');
+    info.className = 'online-result-info';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'online-result-name';
+    nameEl.textContent = found.name;
+    const subEl = document.createElement('div');
+    subEl.className = 'online-result-sub';
+    subEl.textContent = (found.source || 'radio browser').toLowerCase();
+    info.append(nameEl, subEl);
+
+    const actions = document.createElement('div');
+    actions.className = 'online-result-actions';
+    const indicator = document.createElement('span');
+    indicator.className = 'play-ind';
+    indicator.textContent = '▶';
+    indicator.title = 'Прослушать';
+
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'online-add';
+    add.title = 'Добавить в плейлист';
+    add.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>';
+    const markAdded = () => {
+      row.classList.add('in-playlist');
+      add.classList.add('added');
+      add.disabled = true;
+      add.title = 'Уже в плейлисте';
+      add.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+    };
+    if (isInPlaylist(found)) markAdded();
+
+    add.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      add.disabled = true;
+      try {
+        const urls = await Promise.all([found, ...found.backupSources].map(window.AppAPI.resolvePortalStation));
+        const [url, ...backupUrls] = [...new Set(urls.filter(Boolean))];
+        if (url && !state.stations.some(s => s.url === url)) {
+          const station = { id: `user-online-${found.stationuuid || Date.now()}`, name: found.name, url, primaryUrl: url, backupUrls, country: found.countrycode || 'OTHER', genre: (found.tags || 'Other').split(',')[0], image: found.favicon || '', source: found.source || 'Radio Browser' };
+          state.stations.push(station);
+          state.stationHealth[station.id] = true;
+          await saveData();
+          document.getElementById('filterSelect').value = 'all';
+          loadStations();
+        }
+        markAdded();
+      } finally {
+        if (!row.classList.contains('in-playlist')) add.disabled = false;
+      }
+    });
+
+    // Клик по строке (кроме кнопок справа) — сразу проиграть станцию
+    row.addEventListener('click', async () => {
       if (state.currentStation?.id === previewStation.id && (state.audio || state.nativeAudio)) return stopPlay();
       previewStation.url = await window.AppAPI.resolvePortalStation(found);
       if (previewStation.url) playStation(previewStation);
     });
-    const add = document.createElement('button');
-    add.className = 'btn btn-primary';
-    add.textContent = 'Добавить';
-    add.addEventListener('click', async () => {
-      const urls = await Promise.all([found, ...found.backupSources].map(window.AppAPI.resolvePortalStation));
-      const [url, ...backupUrls] = [...new Set(urls.filter(Boolean))];
-      if (!url || state.stations.some(s => s.url === url)) return;
-      const station = { id: `user-online-${found.stationuuid || Date.now()}`, name: found.name, url, primaryUrl: url, backupUrls, country: found.countrycode || 'OTHER', genre: (found.tags || 'Other').split(',')[0], image: found.favicon || '', source: found.source || 'Radio Browser' };
-      state.stations.push(station);
-      state.stationHealth[station.id] = true;
-      await saveData();
-      document.getElementById('filterSelect').value = 'all';
-      loadStations();
-      results.hidden = true;
-      results.replaceChildren();
-      add.textContent = 'Добавлено';
-      add.disabled = true;
-      switchTab('stations');
-    });
-    actions.append(preview, add);
+
+    actions.append(indicator, add);
     row.append(info, actions);
     results.append(row);
+  });
+}
+
+// Уже добавлена ли найденная станция в основной плейлист?
+function isInPlaylist(found) {
+  const url = found.url_resolved || found.url || '';
+  const name = normalizedStationName(found.name);
+  return state.stations.some(station => {
+    if (url && (station.url === url || station.primaryUrl === url)) return true;
+    if (!name || normalizedStationName(station.name) !== name) return false;
+    if (!found.countrycode || !station.country || station.country === 'OTHER') return true;
+    return station.country === found.countrycode;
   });
 }
 
