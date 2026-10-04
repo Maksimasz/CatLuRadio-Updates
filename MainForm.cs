@@ -111,12 +111,20 @@ namespace CatLuRadio
                 AppLog.Info(fixedRuntime is null
                     ? "WebView2: используется встроенный в систему рантайм"
                     : "WebView2: фиксированный рантайм " + Path.GetFileName(fixedRuntime));
+                // Автозапуск последней станции при старте: без этого флага Chromium
+                // требует жеста пользователя до play(), и автостарт падает с
+                // NotAllowedError («пользователь не взаимодействовал со страницей»).
+                var envOptions = new CoreWebView2EnvironmentOptions
+                {
+                    AdditionalBrowserArguments = "--autoplay-policy=no-user-gesture-required"
+                };
                 var env = await CoreWebView2Environment.CreateAsync(
                     browserExecutableFolder: fixedRuntime,
                     // Профиль тоже разделяем со старой версией: WebView2 блокирует
                     // userDataFolder на время работы, и без разделения вторая
                     // копия не смогла бы запуститься одновременно с первой.
-                    userDataFolder: Path.Combine(dataPath, "WebView2-v2"));
+                    userDataFolder: Path.Combine(dataPath, "WebView2-v2"),
+                    options: envOptions);
                 await webView.EnsureCoreWebView2Async(env);
                 webView.CoreWebView2.Settings.IsWebMessageEnabled = true;
                 webView.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = true;
