@@ -136,7 +136,7 @@ CatLuRadio/
 
 ## 🔗 Ссылки
 
-- 🚀 [Скачать последнюю версию](https://github.com/Maksimasz/CatLuRadioMET/releases/latest)
+- 🚀 [Скачать последнюю версию](https://github.com/Maksimasz/CatLuRadioNET/releases/latest)
 - 📦 [Все релизы](https://github.com/Maksimasz/CatLuRadioNET/releases)
 - 🐛 [Задачи и обновления](https://github.com/Maksimasz/CatLuRadioNET/issues)
 
