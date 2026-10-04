@@ -34,6 +34,9 @@ let state = {
       enabled: true,
       duration: 2000 // Длительность перехода в миллисекундах
     },
+    normalization: {
+      enabled: true // Выравнивание громкости станций (компрессор)
+    },
     sleepTimer: {
       enabled: false,
       duration: 60 // Длительность в минутах
@@ -51,6 +54,8 @@ let state = {
 };
 state.stationHealth = {};
 state.isRecoveringStream = false;
+// Потоки, которые не играют с Web Audio (сервер без CORS) — играют без обработки
+state.streamsWithoutWebAudio = new Set();
 
 function rememberLastStation(station) {
   if (!station || station.preview) return;
@@ -83,6 +88,48 @@ function logError(message, error = null) {
   }
 }
 
+
+// Всплывающее уведомление вместо alert(): системное окно блокирует выполнение
+// кода — при серии ошибок воспроизведения пользователь получал стопку одинаковых
+// диалогов, которые приходилось закрывать руками. Тост ничего не блокирует,
+// оформляется стилем приложения и сам исчезает.
+function showToast(message, type = 'info', durationMs = 0) {
+  const root = document.getElementById('toastRoot');
+  if (!root) {
+    // Контейнера ещё нет — сообщение не теряем, но и не падаем.
+    console.warn('[toast]', message);
+    return;
+  }
+
+  const toast = document.createElement('div');
+  toast.className = 'toast toast--' + type;
+  toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+
+  const text = document.createElement('div');
+  text.className = 'toast__text';
+  // textContent, а не innerHTML: в сообщениях попадаются URL потоков.
+  text.textContent = message;
+  toast.appendChild(text);
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'toast__close';
+  close.setAttribute('aria-label', 'Закрыть уведомление');
+  close.textContent = '×';
+  close.addEventListener('click', () => toast.remove());
+  toast.appendChild(close);
+
+  root.appendChild(toast);
+
+  // Не больше четырёх уведомлений одновременно: ошибки приходят пачками.
+  while (root.children.length > 4) {
+    root.firstElementChild.remove();
+  }
+
+  // Ошибки держим дольше — в них бывает URL потока и подсказка, что делать.
+  const ttl = durationMs || (type === 'error' ? 12000 : 6000);
+  setTimeout(() => toast.remove(), ttl);
+}
 // Инициализация
 async function init() {
   const initStartTime = performance.now();
@@ -169,6 +216,10 @@ async function loadData() {
         crossfade: {
           ...state.settings.crossfade,
           ...(savedSettings.crossfade || {})
+        },
+        normalization: {
+          ...state.settings.normalization,
+          ...(savedSettings.normalization || {})
         },
         sleepTimer: {
           ...state.settings.sleepTimer,
@@ -354,6 +405,20 @@ async function saveData() {
     logError('Error saving data:', error);
     throw error;
   }
+}
+
+// Автозапуск при старте упирается в политику autoplay Chromium: без жеста
+// пользователя play() отклоняется NotAllowedError. Вместо ошибки ждём первого
+// касания/клавиши и запускаем станцию уже с разрешения браузера.
+function startAfterUserGesture(audioElement) {
+  const onGesture = () => {
+    document.removeEventListener('pointerdown', onGesture, true);
+    document.removeEventListener('keydown', onGesture, true);
+    if (state.isStopping || state.audio !== audioElement) return;
+    audioElement.play().catch(err => console.error('Автозапуск после жеста не удался:', err));
+  };
+  document.addEventListener('pointerdown', onGesture, true);
+  document.addEventListener('keydown', onGesture, true);
 }
 
 // Автоматический запуск последней играющей станции
@@ -814,6 +879,17 @@ function renderFavorites() {
   });
 }
 
+// Применить громкость к активному плееру: через gain графа Web Audio, если
+// элемент подключён к обработке звука, иначе напрямую к элементу
+function applyPlaybackVolume(volume) {
+  if (!state.audio) return;
+  if (state.equalizer && state.equalizer.isAttachedTo(state.audio)) {
+    state.equalizer.setVolume(volume);
+  } else {
+    state.audio.volume = volume;
+  }
+}
+
 // Функция для плавного затухания (fade out) через volume
 function fadeOutVolume(audioElement, duration, onComplete) {
   if (!audioElement) {
@@ -846,7 +922,9 @@ function fadeOutVolume(audioElement, duration, onComplete) {
 function fadeInVolume(audioElement, duration) {
   if (!audioElement) return;
   
-  const targetVolume = state.volume;
+  // Если элемент подключён к графу Web Audio, его реальная громкость задаётся
+  // gain графа — сам элемент плавно доводим до 1.0, а не до state.volume
+  const targetVolume = (state.equalizer && state.equalizer.isAttachedTo(audioElement)) ? 1 : state.volume;
   const steps = 20; // Количество шагов для плавности
   const stepDuration = duration / steps;
   const volumeStep = targetVolume / steps;
@@ -892,6 +970,17 @@ async function playStation(station) {
   
   // Сохранить ссылку на старое аудио для crossfade
   const oldAudio = state.audio;
+
+  // HLS-инстанс прежней станции забираем под контроль: при кроссфейде чистка
+  // state.hls в playStation пропускается, и живой инстанс переподключает
+  // MediaSource к уже остановленному элементу и сам вызывает play() — старая
+  // станция продолжает «играть» в тишине. Гасим его вместе со старым аудио.
+  const oldHls = state.hls;
+  state.hls = null;
+  const stopOldHls = () => {
+    if (!oldHls) return;
+    try { oldHls.stopLoad(); oldHls.detachMedia(); oldHls.destroy(); } catch (e) {}
+  };
   
   // Обновить информацию о текущей станции сразу
   state.currentStation = station;
@@ -912,15 +1001,39 @@ async function playStation(station) {
     state.audio = null;
     state.isStopping = false;
   } else if (oldAudio && useCrossfade) {
-    // При crossfade освобождаем ссылку, но старое аудио продолжит играть
-    // Fade out начнется когда новое аудио начнет играть
+    // При crossfade старое аудио продолжает играть, пока новое не начнётся.
+    // Глушим его собственным таймером, а не по событию playing нового
+    // элемента: если новая станция браузером не поддержана (ошибка, запуск
+    // через LibVLC) события playing не бывает — раньше старая играла вечно,
+    // и звучали две станции сразу.
+    let oldAudioStopped = false;
+    const stopOldAudio = () => {
+      if (oldAudioStopped) return;
+      oldAudioStopped = true;
+      try {
+        if (oldAudio && oldAudio !== state.audio) {
+          oldAudio.pause();
+          oldAudio.src = '';
+          oldAudio.load();
+        }
+      } catch (e) {
+        // Игнорировать ошибки
+      }
+      stopOldHls();
+    };
+    fadeOutVolume(oldAudio, crossfadeDuration, stopOldAudio);
+    setTimeout(stopOldAudio, crossfadeDuration + 500);
     state.audio = null;
   }
+
+  // HLS прежней станции гасим сразу; при кроссфейде он умирает вместе с
+  // остановкой старого аудио, чтобы fade out не прерывался.
+  if (!(oldAudio && useCrossfade)) stopOldHls();
   
   // Проверить валидность URL
   if (!station.url || !station.url.trim()) {
     state.isSwitching = false;
-    alert('Ошибка: не указан URL станции');
+    showToast('Ошибка: не указан URL станции', 'error');
     return;
   }
   
@@ -934,17 +1047,13 @@ async function playStation(station) {
     new URL(streamUrl);
   } catch (e) {
     state.isSwitching = false;
-    alert('Ошибка: неверный формат URL станции');
+    showToast('Ошибка: неверный формат URL станции', 'error');
     return;
   }
 
   // LibVLC — основной движок: он ждёт начало вывода звука. При неудаче ниже
   // сохраняется прежний браузерный путь как совместимый резерв.
   if (!crossfadeEnabled) {
-    if (state.hls) {
-      try { state.hls.stopLoad(); state.hls.detachMedia(); state.hls.destroy(); } catch (e) {}
-      state.hls = null;
-    }
     const nativeResult = await window.AppAPI.playNative(streamUrl, state.volume);
     if (nativeResult?.success) {
       state.nativeAudio = true;
@@ -961,7 +1070,7 @@ async function playStation(station) {
 
   // Резервный путь: LibVLC не запустил поток или включён кроссфейд —
   // дальше воспроизведение идёт через <audio>/HLS/Web Audio в самой странице.
-  await playInBrowserPlayer({ station, streamUrl, oldAudio, useCrossfade, crossfadeDuration });
+  await playInBrowserPlayer({ station, streamUrl, useCrossfade, crossfadeDuration });
 }
 
 
@@ -1033,6 +1142,29 @@ function createStreamErrorHandler({ station, streamUrl, audioElement, contentTyp
       return;
     }
     
+    // Станция с Web Audio (эквалайзер/выравнивание) не запустилась и ни разу не
+    // играла — обычно сервер не отдаёт CORS-заголовки для crossOrigin='anonymous'.
+    // Запоминаем поток и перезапускаем станцию уже без обработки, чтобы она
+    // гарантированно играла (чёрный список живёт до перезагрузки страницы).
+    if (retryState.canFallbackToNoWebAudio && !audioElement.__reachedPlaying) {
+      retryState.canFallbackToNoWebAudio = false;
+      state.streamsWithoutWebAudio.add(streamUrl);
+      console.warn('Поток не запустился с Web Audio (нет CORS?) — перезапуск без обработки:', streamUrl);
+      try {
+        audioElement.pause();
+        audioElement.src = '';
+        audioElement.load();
+      } catch (e) {
+        // Игнорируем ошибки очистки элемента
+      }
+      if (state.equalizer) state.equalizer.releaseSourceFor(audioElement);
+      if (state.audio === audioElement) state.audio = null;
+      state.isSwitching = false;
+      showToast('Станция играет без обработки звука:\nсервер не поддерживает режим CORS.', 'info');
+      playStation(station).catch(err => console.error('Ошибка перезапуска станции без обработки:', err));
+      return;
+    }
+    
     // Для MP3 потоков попробовать перезагрузить с более длительной задержкой
     if (contentType === 'audio/mpeg' && retryState.retryCount < retryState.maxRetries) {
       retryState.retryCount++;
@@ -1097,6 +1229,12 @@ function createStreamErrorHandler({ station, streamUrl, audioElement, contentTyp
       if (nativeResult?.success && state.audio === audioElement && !state.isStopping) {
         audioElement.src = '';
         state.audio = null;
+        // Запуск через LibVLC: HLS-инстанс этой же станции глушим, иначе он
+        // переподключит MediaSource и продолжит играть параллельно с VLC.
+        if (state.hls) {
+          try { state.hls.stopLoad(); state.hls.detachMedia(); state.hls.destroy(); } catch (e) {}
+          state.hls = null;
+        }
         state.nativeAudio = true;
         state.isPlaying = true;
         state.currentStation = station;
@@ -1138,7 +1276,7 @@ function createStreamErrorHandler({ station, streamUrl, audioElement, contentTyp
     updateNowPlaying('—');
     renderStations(state.stations);
     saveData();
-    alert(userErrorMessage + '\n\nРабочий резервный поток не найден.');
+    showToast(userErrorMessage + '\n\nРабочий резервный поток не найден.', 'error');
   };
 }
 
@@ -1146,7 +1284,7 @@ function createStreamErrorHandler({ station, streamUrl, audioElement, contentTyp
  * Вешает обработчики <audio> на элемент: обновление статуса, кроссфейд,
  * повторные загрузки и запуск через LibVLC при ошибке (см. createStreamErrorHandler).
  */
-function bindAudioElementEvents({ station, streamUrl, audioElement, contentType, useCrossfade, crossfadeDuration, oldAudio, retryState }) {
+function bindAudioElementEvents({ station, streamUrl, audioElement, contentType, useCrossfade, crossfadeDuration, retryState }) {
   // Обработчики событий
   const handleLoadStart = () => {
     if (!state.isStopping && state.audio === audioElement) {
@@ -1181,7 +1319,7 @@ function bindAudioElementEvents({ station, streamUrl, audioElement, contentType,
                 if (!state.isStopping && state.audio === audioElement && audioElement.readyState >= 2) {
                   audioElement.play().catch(retryError => {
                     console.error('Retry play error:', retryError);
-                    alert('Ошибка воспроизведения: ' + station.name + '\nПроверьте URL потока.');
+                    showToast('Ошибка воспроизведения: ' + station.name + '\nПроверьте URL потока.', 'error');
                     state.isPlaying = false;
       // Обновить медиа-сессию
       if ('mediaSession' in navigator) {
@@ -1195,7 +1333,7 @@ function bindAudioElementEvents({ station, streamUrl, audioElement, contentType,
                     updateNowPlaying('—');
                   });
                 } else {
-                  alert('Ошибка воспроизведения: ' + station.name + '\nПоток не загружается.');
+                  showToast('Ошибка воспроизведения: ' + station.name + '\nПоток не загружается.', 'error');
                   state.isPlaying = false;
       // Обновить медиа-сессию
       if ('mediaSession' in navigator) {
@@ -1209,8 +1347,17 @@ function bindAudioElementEvents({ station, streamUrl, audioElement, contentType,
                   updateNowPlaying('—');
                 }
               }, 1000);
+            } else if (error && error.name === 'NotAllowedError') {
+              // Автозапуск без жеста пользователя — не ошибка, а ожидание:
+              // станция запустится после первого касания/клавиши (см.
+              // startAfterUserGesture), пугать сообщением не нужно.
+              state.isSwitching = false;
+              state.isPlaying = false;
+              updatePlayButton();
+              startAfterUserGesture(audioElement);
+              showToast('Автозапуск ждёт нажатия: ' + station.name + '\nНажмите в окне — станция продолжит.', 'info');
             } else {
-              alert('Ошибка воспроизведения: ' + station.name + '\n' + error.message);
+              showToast('Ошибка воспроизведения: ' + station.name + '\n' + error.message, 'error');
               state.isPlaying = false;
       // Обновить медиа-сессию
       if ('mediaSession' in navigator) {
@@ -1231,6 +1378,7 @@ function bindAudioElementEvents({ station, streamUrl, audioElement, contentType,
   
   const handlePlay = () => {
     if (!state.isStopping && state.audio === audioElement) {
+      audioElement.__reachedPlaying = true;
       state.isPlaying = true;
       station.incompatible = false;
       state.stationHealth[station.id] = true;
@@ -1252,26 +1400,9 @@ function bindAudioElementEvents({ station, streamUrl, audioElement, contentType,
       renderStations(state.stations);
       renderFavorites();
       
-      // Если используется crossfade и есть старое аудио - начать fade out старого
-      if (useCrossfade && oldAudio && oldAudio !== audioElement) {
-        let oldAudioStopped = false;
-        const stopOldAudio = () => {
-          if (oldAudioStopped) return;
-          oldAudioStopped = true;
-          // После завершения fade out остановить старое аудио
-          try {
-            if (oldAudio && oldAudio !== state.audio) {
-              oldAudio.pause();
-              oldAudio.src = '';
-              oldAudio.load();
-            }
-          } catch (e) {
-            // Игнорировать ошибки
-          }
-        };
-        fadeOutVolume(oldAudio, crossfadeDuration, stopOldAudio);
-        setTimeout(stopOldAudio, crossfadeDuration + 500);
-      }
+      // Fade out старой станции теперь делается в playStation в момент
+      // переключения: от события playing нового элемента это зависеть не может,
+      // иначе старая станция остаётся играть, когда новая не стартовала в вебе.
     }
   };
   
@@ -1407,7 +1538,15 @@ function setupHlsSession({ audioElement, streamUrl, station, useCrossfade, cross
         }
       }).catch(error => {
         console.error('HLS play error:', error);
-        alert('Ошибка воспроизведения HLS потока: ' + station.name);
+        if (error && error.name === 'NotAllowedError') {
+          // Автозапуск без жеста — ждём касания/клавиши, см. startAfterUserGesture.
+          state.isSwitching = false;
+          state.isPlaying = false;
+          startAfterUserGesture(audioElement);
+          showToast('Автозапуск ждёт нажатия: ' + station.name + '\nНажмите в окне — станция продолжит.', 'info');
+          return;
+        }
+        showToast('Ошибка воспроизведения HLS потока: ' + station.name, 'error');
         state.isPlaying = false;
     // Обновить медиа-сессию
     if ('mediaSession' in navigator) {
@@ -1422,6 +1561,9 @@ function setupHlsSession({ audioElement, streamUrl, station, useCrossfade, cross
   });
   
   hls.on(Hls.Events.ERROR, (event, data) => {
+    // Инстанс уже не текущий (станция переключена): восстановление ничего не
+    // запускает, иначе он оживит старый аудио-элемент.
+    if (state.hls !== hls) return;
     console.error('HLS error:', data);
     if (data.fatal) {
       switch (data.type) {
@@ -1436,7 +1578,7 @@ function setupHlsSession({ audioElement, streamUrl, station, useCrossfade, cross
         default:
           console.error('HLS fatal error, cannot recover');
           hls.destroy();
-          alert('Ошибка загрузки HLS потока: ' + station.name + '\nФормат аудио не поддерживается.\n\nURL: ' + streamUrl);
+          showToast('Ошибка загрузки HLS потока: ' + station.name + '\nФормат аудио не поддерживается.\n\nURL: ' + streamUrl, 'error');
           state.isPlaying = false;
     // Обновить медиа-сессию
     if ('mediaSession' in navigator) {
@@ -1452,7 +1594,7 @@ function setupHlsSession({ audioElement, streamUrl, station, useCrossfade, cross
   });
 }
 
-async function playInBrowserPlayer({ station, streamUrl, oldAudio, useCrossfade, crossfadeDuration }) {
+async function playInBrowserPlayer({ station, streamUrl, useCrossfade, crossfadeDuration }) {
   const { contentType, isHLS, hlsSupported, useHLS } = detectStreamFormat(streamUrl);
   
   // Создать новый аудио элемент с правильными настройками
@@ -1461,9 +1603,14 @@ async function playInBrowserPlayer({ station, streamUrl, oldAudio, useCrossfade,
   audioElement.volume = useCrossfade ? 0 : state.volume;
   audioElement.preload = 'auto';
   
-  // Прямые потоки играем без Web Audio API: часть порталов при CORS-режиме молчит.
-  const equalizerEnabled = useHLS && state.settings.equalizer && state.settings.equalizer.enabled && window.Equalizer;
-  if (useHLS) {
+  // Обработка звука (эквалайзер и/или выравнивание громкости) идёт через Web Audio
+  // API. Для прямых потоков это требует crossOrigin='anonymous', а часть серверов
+  // в CORS-режиме молчит — тогда станция по ошибке автоматически перезапускается
+  // уже без обработки (см. createStreamErrorHandler, state.streamsWithoutWebAudio).
+  const eqWanted = !!(state.settings.equalizer && state.settings.equalizer.enabled && window.Equalizer);
+  const normWanted = !!(state.settings.normalization && state.settings.normalization.enabled !== false && window.Equalizer);
+  const processingWanted = (eqWanted || normWanted) && !state.streamsWithoutWebAudio.has(streamUrl);
+  if (processingWanted || useHLS) {
     audioElement.crossOrigin = 'anonymous';
   }
   
@@ -1472,23 +1619,20 @@ async function playInBrowserPlayer({ station, streamUrl, oldAudio, useCrossfade,
     setupHlsSession({ audioElement, streamUrl, station, useCrossfade, crossfadeDuration });
   } else if (isHLS && !hlsSupported) {
     // HLS не поддерживается браузером
-    alert('HLS потоки (m3u8) не поддерживаются в этом браузере.\n\nПопробуйте использовать другой поток или обновить браузер.');
+    showToast('HLS потоки (m3u8) не поддерживаются в этом браузере.\n\nПопробуйте использовать другой поток или обновить браузер.', 'error');
     state.isSwitching = false;
     return;
   }
   
-  // Инициализировать эквалайзер если он включен
-  if (equalizerEnabled) {
+  // Подключаем Web Audio при обработке; иначе отвязываем прошлый элемент с
+  // задержкой, чтобы затухающая при кроссфейде станция не обрывалась
+  const releaseDelay = useCrossfade ? crossfadeDuration + 500 : 0;
+  if (processingWanted) {
     if (!state.equalizer) {
       state.equalizer = new window.Equalizer();
     }
-    
-    // Отключить старый эквалайзер если есть
-    state.equalizer.disconnect();
-    
-    // Инициализировать с новым аудио элементом
-    // Важно: это должно быть сделано ПОСЛЕ установки crossOrigin, но ДО установки src
-    // Но init будет вызван после установки src, поэтому crossOrigin уже установлен
+  } else if (state.equalizer) {
+    state.equalizer.releaseSources(releaseDelay);
   }
   
   // Установить источник напрямую (только если не HLS, для HLS источник устанавливается через hls.loadSource)
@@ -1511,10 +1655,15 @@ async function playInBrowserPlayer({ station, streamUrl, oldAudio, useCrossfade,
     }
   }
   
-  // Инициализировать эквалайзер ПОСЛЕ установки src (но crossOrigin уже установлен выше)
-  if (equalizerEnabled && state.equalizer) {
-    // Инициализировать с новым аудио элементом
-    if (state.equalizer.init(audioElement)) {
+  // Инициализировать обработку ПОСЛЕ установки src (crossOrigin уже установлен)
+  if (processingWanted && state.equalizer) {
+    const eqAttached = state.equalizer.init(audioElement, {
+      useEqualizer: eqWanted,
+      useNormalization: normWanted,
+      releaseDelay,
+      volume: state.volume
+    });
+    if (eqAttached) {
       // Применить сохраненные настройки
       if (state.settings.equalizer.values) {
         state.equalizer.setValues(state.settings.equalizer.values);
@@ -1522,13 +1671,18 @@ async function playInBrowserPlayer({ station, streamUrl, oldAudio, useCrossfade,
       if (state.settings.equalizer.preset) {
         state.equalizer.setPreset(state.settings.equalizer.preset);
       }
+      // Элемент в графе: ползунок громкости работает через gain графа,
+      // сам элемент держим на полной громкости (кроме кроссфейда — fade 0..1)
+      if (!useCrossfade) {
+        audioElement.volume = 1;
+      }
     }
   }
   
   // Общее состояние повторных попыток (нужно обработчику ошибок и handleStalled)
-  const retryState = { retryCount: 0, maxRetries: 2, terminalErrorPending: false };
+  const retryState = { retryCount: 0, maxRetries: 2, terminalErrorPending: false, canFallbackToNoWebAudio: processingWanted && !useHLS };
   
-  bindAudioElementEvents({ station, streamUrl, audioElement, contentType, useCrossfade, crossfadeDuration, oldAudio, retryState });
+  bindAudioElementEvents({ station, streamUrl, audioElement, contentType, useCrossfade, crossfadeDuration, retryState });
   
   // Сохранить ссылку на элемент
   state.audio = audioElement;
@@ -1552,7 +1706,7 @@ async function playInBrowserPlayer({ station, streamUrl, oldAudio, useCrossfade,
     state.isSwitching = false;
   } catch (e) {
     console.error('Ошибка при загрузке аудио:', e);
-    alert('Ошибка при загрузке станции: ' + station.name);
+    showToast('Ошибка при загрузке станции: ' + station.name, 'error');
     state.audio = null;
     state.currentStation = null;
     state.isSwitching = false;
@@ -2098,9 +2252,7 @@ function setupEventListeners() {
     if (miniVolumeSlider) miniVolumeSlider.value = volume * 100;
     if (miniVolumeValue) miniVolumeValue.textContent = Math.round(volume * 100) + '%';
     
-    if (state.audio) {
-      state.audio.volume = volume;
-    }
+    applyPlaybackVolume(volume);
     if (state.nativeAudio) window.AppAPI.setNativeVolume(volume);
     
     saveData();
@@ -2138,9 +2290,7 @@ function setupEventListeners() {
       if (volumeSlider) volumeSlider.value = volume * 100;
       if (volumeValue) volumeValue.textContent = Math.round(volume * 100) + '%';
       
-      if (state.audio) {
-        state.audio.volume = volume;
-      }
+      applyPlaybackVolume(volume);
       if (state.nativeAudio) window.AppAPI.setNativeVolume(volume);
       
       saveData();
@@ -2175,7 +2325,7 @@ function setupEventListeners() {
     if (editingId) {
       await updateStation(editingId);
     } else {
-      alert('Ошибка: не выбрана станция для редактирования');
+      showToast('Ошибка: не выбрана станция для редактирования', 'error');
     }
   });
   
@@ -2608,6 +2758,72 @@ function initEqualizer() {
       }
     });
   }
+
+  // Чекбоксы включения эквалайзера и выравнивания громкости
+  const eqEnableChk = document.getElementById('eqEnableChk');
+  const normEnableChk = document.getElementById('normEnableChk');
+  if (eqEnableChk) {
+    eqEnableChk.checked = !!state.settings.equalizer?.enabled;
+    eqEnableChk.onchange = () => {
+      if (!state.settings.equalizer) {
+        state.settings.equalizer = { enabled: true, values: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], preset: 'normal' };
+      }
+      state.settings.equalizer.enabled = eqEnableChk.checked;
+      saveData();
+      applyAudioProcessingChange();
+    };
+  }
+  if (normEnableChk) {
+    normEnableChk.checked = !state.settings.normalization || state.settings.normalization.enabled !== false;
+    normEnableChk.onchange = () => {
+      if (!state.settings.normalization) state.settings.normalization = { enabled: true };
+      state.settings.normalization.enabled = normEnableChk.checked;
+      saveData();
+      applyAudioProcessingChange();
+    };
+  }
+}
+
+// Применить изменение вкл/выкл обработки звука на лету: если элемент уже в графе —
+// просто переключаем блоки; если обработку включили на потоке, идущем в обход
+// Web Audio — перезапускаем текущую станцию уже с обработкой
+function applyAudioProcessingChange() {
+  const eqWanted = !!(state.settings.equalizer && state.settings.equalizer.enabled && window.Equalizer);
+  const normWanted = !!(state.settings.normalization && state.settings.normalization.enabled !== false && window.Equalizer);
+  const wanted = eqWanted || normWanted;
+
+  if (!state.audio) return;
+
+  if (state.equalizer && state.equalizer.isAttachedTo(state.audio)) {
+    state.equalizer.configure({ useEqualizer: eqWanted, useNormalization: normWanted });
+    return;
+  }
+
+  if (wanted && state.isPlaying && state.currentStation) {
+    // Поток уже известен как «без CORS» — перезапуск не поможет
+    if (state.streamsWithoutWebAudio.has(state.currentStation.url)) {
+      showToast('Для этой станции обработка звука недоступна:\nсервер не отдаёт CORS-заголовки.', 'info');
+      return;
+    }
+    // Быстро гасим текущий элемент и перезапускаем станцию через playStation
+    const oldAudio = state.audio;
+    state.isPlaying = false;
+    state.isSwitching = false;
+    fadeOutVolume(oldAudio, 300, () => {
+      try {
+        oldAudio.pause();
+        oldAudio.src = '';
+        oldAudio.load();
+      } catch (e) {
+        // Игнорируем ошибки очистки элемента
+      }
+      if (state.equalizer) state.equalizer.releaseSources(0);
+      if (state.audio === oldAudio) state.audio = null;
+      if (state.currentStation) {
+        playStation(state.currentStation).catch(err => console.error('Ошибка перезапуска станции:', err));
+      }
+    });
+  }
 }
 
 // Переключение вкладок
@@ -2698,7 +2914,7 @@ function editStation(stationId) {
   const station = state.stations.find(s => s.id === stationId);
   
   if (!station) {
-    alert('Станция не найдена');
+    showToast('Станция не найдена', 'error');
     return;
   }
   
@@ -2842,7 +3058,7 @@ async function deleteStation(stationId) {
   const stationIndex = state.stations.findIndex(s => s.id === stationId);
   
   if (stationIndex === -1) {
-    alert('Станция не найдена');
+    showToast('Станция не найдена', 'error');
     return;
   }
   
@@ -2869,7 +3085,7 @@ async function deleteStation(stationId) {
     loadStations();
   } catch (error) {
     console.error('Ошибка при удалении станции:', error);
-    alert('Ошибка при удалении станции: ' + error.message);
+    showToast('Ошибка при удалении станции: ' + error.message, 'error');
   }
 }
 
@@ -2998,7 +3214,7 @@ function setupIPCListeners() {
   });
   
   register('onShowAbout', () => {
-    alert('CatLu Radio v3.1.12\n\nПриложение для прослушивания интернет-радио.');
+    showToast('CatLu Radio v3.5.0\n\nПриложение для прослушивания интернет-радио.', 'info');
   });
   
   // При выгрузке страницы помечаем закрытие: stopPlay() в этом случае не
@@ -3016,13 +3232,13 @@ async function exportStations() {
     const result = await window.AppAPI.exportStations(state.stations);
     
     if (result.success) {
-      alert(`Станции успешно экспортированы в файл:\n${result.path}`);
+      showToast(`Станции успешно экспортированы в файл:\n${result.path}`, 'success');
     } else if (!result.canceled) {
-      alert(`Ошибка экспорта: ${result.error || 'Неизвестная ошибка'}`);
+      showToast(`Ошибка экспорта: ${result.error || 'Неизвестная ошибка'}`, 'error');
     }
   } catch (error) {
     console.error('Export error:', error);
-    alert('Ошибка при экспорте станций');
+    showToast('Ошибка при экспорте станций', 'error');
   }
 }
 
@@ -3036,16 +3252,16 @@ async function importStations() {
       if (result.skipped && result.skipped > 0) {
         message += `\nПропущено дубликатов: ${result.skipped}`;
       }
-      alert(message);
+      showToast(message, 'success');
       // Перезагрузить данные и обновить список
       await loadData();
       loadStations();
     } else if (!result.canceled) {
-      alert(`Ошибка импорта: ${result.error || 'Неизвестная ошибка'}`);
+      showToast(`Ошибка импорта: ${result.error || 'Неизвестная ошибка'}`, 'error');
     }
   } catch (error) {
     console.error('Import error:', error);
-    alert('Ошибка при импорте станций. Проверьте формат файла.');
+    showToast('Ошибка при импорте станций. Проверьте формат файла.', 'error');
   }
 }
 

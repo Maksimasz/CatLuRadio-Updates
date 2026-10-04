@@ -1375,3 +1375,84 @@ body {
 [data-theme="dark"] .mini-player {
   background: linear-gradient(135deg, var(--md-primary) 0%, var(--md-primary-variant) 100%);
 }
+
+/* ── Всплывающие уведомления (showToast в renderer.js) ─────────────────── */
+.toast-root {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(420px, calc(100vw - 32px));
+  /* щелчки проходят мимо контейнера, если он пустой */
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  border: 1px solid var(--md-shadow);
+  border-left: 3px solid var(--md-primary);
+  box-shadow: 0 6px 24px var(--md-shadow);
+  font-size: 13px;
+  line-height: 1.45;
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast--error {
+  border-left-color: var(--md-error);
+}
+
+.toast--success {
+  border-left-color: var(--md-primary);
+}
+
+.toast__text {
+  flex: 1;
+  min-width: 0;
+  /* в сообщениях есть переносы строк, а URL потока не должен растягивать карточку */
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.toast__close {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  opacity: 0.65;
+}
+
+.toast__close:hover {
+  opacity: 1;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}

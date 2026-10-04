@@ -15,7 +15,13 @@ if (source.includes('!station.incompatible && result?.success')) throw new Error
 if (!source.includes('state.nativeAudio = true')) throw new Error('Нет резервного проигрывателя');
 if (!source.includes("streamUrl.startsWith('http://') && streamCheck?.success")) throw new Error('HTTPS-поток ошибочно передаётся в резервный проигрыватель');
 if (!source.includes("addEventListener('playing', handlePlay)")) throw new Error('Статус воспроизведения ставится до появления звука');
-if (!source.includes('const equalizerEnabled = useHLS')) throw new Error('Прямые потоки принудительно проходят через CORS-эквалайзер');
+// Раньше здесь стоял гейт `const equalizerEnabled = useHLS`: он отключал
+// Web Audio на всех прямых потоках (18 из 19 станций), из-за чего «перестал
+// работать эквалайзер». Теперь обработка (эквалайзер и выравнивание
+// громкости) подключается ко всем станциям, а серверы без CORS получают
+// аварийный перезапуск уже без обработки — чтобы не молчать.
+if (!source.includes('const processingWanted =')) throw new Error('Обработка звука не подключена к прямым потокам');
+if (!source.includes('state.streamsWithoutWebAudio.add(streamUrl)')) throw new Error('Нет аварийного перезапуска потока без CORS');
 if (source.includes('station && state.stationHealth[station.id] !== false')) throw new Error('Проверка потока блокирует запуск станции');
 if (!source.includes('delete state.stationHealth[station.id];')) throw new Error('Неудачная фоновая проверка помечает станцию недоступной');
 if (!source.includes('if (!crossfadeEnabled)') || !source.includes('const nativeResult = await window.AppAPI.playNative(streamUrl, state.volume);')) throw new Error('LibVLC не запускается первым для обычного переключения');
@@ -63,5 +69,13 @@ if (source.includes("${found.codec || '?'} ${found.bitrate || '?'} kbps")) throw
 if (!source.includes('checkForUpdates();') || !source.includes('installAvailableUpdate')) throw new Error('Проверка обновлений при запуске не подключена');
 if (!adapter.includes("checkForUpdate: () => sendToNative('checkForUpdate')")) throw new Error('Проверка обновлений не передаётся в приложение');
 if (!index.includes('id="system"') || !index.includes('id="checkUpdateBtn"') || !index.includes('Maksimasz/CatLuRadio-Updates')) throw new Error('Обновления не размещены в разделе системы');
+
+// alert() блокирует страницу: при серии ошибок воспроизведения складывалась
+// стопка одинаковых системных окон, которые надо закрывать руками. Всё, что
+// раньше было alert(), стало showToast(); confirm() для подтверждения
+// удаления и сброса остаётся — там блокировка и нужна.
+if (/^\s*alert\(/m.test(source)) throw new Error('В renderer остался блокирующий alert() вместо showToast()');
+if (!source.includes('function showToast(')) throw new Error('Нет showToast() — уведомления некуда показывать');
+if (!index.includes('id="toastRoot"')) throw new Error('В index.html нет контейнера toastRoot');
 
 console.log('Playback guards: OK');

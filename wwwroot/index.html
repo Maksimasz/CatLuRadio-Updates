@@ -10,7 +10,7 @@
     console.log('Время:', new Date().toLocaleTimeString());
   </script>
   <!-- WebView2 API -->
-  <script src="js/api-adapter.js?v=3.1.12"></script>
+  <script src="js/api-adapter.js?v=3.5.0"></script>
   <!-- HLS.js для поддержки HLS потоков (m3u8) -->
   <script src="js/hls.min.js"></script>
 </head>
@@ -159,6 +159,16 @@
             </select>
             <button id="eqResetBtn" class="btn btn-secondary">Сброс</button>
           </div>
+        </div>
+        <div class="form-group" style="display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; margin-bottom: 12px;">
+          <label>
+            <input type="checkbox" id="eqEnableChk">
+            Эквалайзер
+          </label>
+          <label>
+            <input type="checkbox" id="normEnableChk">
+            Выравнивание громкости
+          </label>
         </div>
         <div class="equalizer-bands" id="equalizerBands">
           <!-- Полосы эквалайзера будут добавлены динамически -->
@@ -506,8 +516,11 @@
   <script src="modules/ThemeManager.js"></script>
   <script src="modules/StationSorter.js"></script>
   <script src="modules/Equalizer.js"></script>
+  <!-- Контейнер всплывающих уведомлений: см. showToast() в renderer.js -->
+  <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+
   <!-- Основной скрипт -->
-  <script src="js/renderer.js?v=3.1.12"></script>
+  <script src="js/renderer.js?v=3.5.0"></script>
   <!-- Функции для аккордеонов -->
   <script>
     function toggleAccordion(id) {
