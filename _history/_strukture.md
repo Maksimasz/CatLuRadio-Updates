@@ -216,3 +216,11 @@
 - Добавлена проверка обновлений при запуске и вручную в `Настройки → Система`, а также скачивание и запуск установщика новой версии.
 - Выполнены `dotnet publish -c Release -r win-x64 --self-contained true`, Inno Setup, `node --check` и `node tests/playback-guard.test.js`.
 - Опубликован релиз `v3.1.12`: `https://github.com/Maksimasz/CatLuRadio-Updates/releases/tag/v3.1.12`; установщик `CatLuRadio-3.1.12-Standalone-Setup-desktop.exe` (341 МБ).
+
+## Версия 3.5.0 2026-10-04
+
+- Переработан звук: 10-полосный эквалайзер и выравнивание громкости (компрессор + makeup-усиление) включены на всех станциях; чекбоксы на вкладке «Эквалайзер», аварийный перезапуск без Web Audio для серверов без CORS, отложенная отвязка источников при кроссфейде.
+- Автозапуск без жеста (`--autoplay-policy=no-user-gesture-required`), тосты вместо alert, фикс двойного воспроизведения и обрыва кроссфейда; инструмент сплошной HTTP-проверки станций в `tools/`.
+- Git подключён к GitHub: remote `https://github.com/Maksimasz/CatLuRadio-Updates` (приватный), исходники запушены поверх исходного README-коммита.
+- Выполнены `dotnet publish -c Release -r win-x64 --self-contained true` и Inno Setup 6.7.3; готовый установщик — `release/CatLuRadio-3.5.0-Standalone-Setup-desktop.exe` (341 МБ).
+- Опубликован релиз `v3.5.0`: `https://github.com/Maksimasz/CatLuRadio-Updates/releases/tag/v3.5.0`; установщик `CatLuRadio-3.5.0-Standalone-Setup-desktop.exe` (357 517 606 байт), SHA-256 ассета совпал с локальным файлом.
