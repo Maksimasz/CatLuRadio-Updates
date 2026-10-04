@@ -1084,57 +1084,44 @@ body {
   flex-shrink: 0;
 }
 
-/* Аккордеоны для настроек */
-.settings-accordion {
-  margin-bottom: 16px;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--md-surface);
-}
-
-.accordion-header {
+/* Вкладки-панели внутри настроек (вместо аккордеонов) */
+.settings-nav {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  cursor: pointer;
-  background: var(--md-surface-container-low);
-  transition: background 0.2s;
-  user-select: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
 }
 
-.accordion-header:hover {
-  background: var(--md-surface-container);
-}
-
-.accordion-header h3 {
-  margin: 0;
-  font-size: 1.1em;
+.settings-nav-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-btn);
+  background: var(--card-bg);
+  color: var(--subtle-text);
+  font-family: inherit;
+  font-size: 13px;
   font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.1s ease, color 0.1s ease, border-color 0.1s ease;
 }
 
-.accordion-arrow {
-  transition: transform 0.3s;
-  font-size: 0.9em;
-  color: var(--md-on-surface-variant);
+.settings-nav-btn:hover {
+  background: var(--hover-tint);
+  color: var(--md-on-surface);
 }
 
-.accordion-header.active .accordion-arrow {
-  transform: rotate(180deg);
+.settings-nav-btn.active {
+  background: var(--md-primary);
+  border-color: var(--md-primary);
+  color: var(--md-on-primary);
 }
 
-.accordion-content {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease-out;
-  padding: 0 16px;
+.settings-panel {
+  display: none;
 }
 
-.accordion-content.active {
-  max-height: 2000px;
-  padding: 16px;
-  transition: max-height 0.5s ease-in;
+.settings-panel.active {
+  display: block;
 }
 
 .eq-slider::-moz-range-thumb {

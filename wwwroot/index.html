@@ -187,19 +187,23 @@
       <div class="settings-form">
         <h2>Настройки</h2>
         
+        <div class="settings-nav" role="tablist">
+          <button type="button" class="settings-nav-btn active" data-panel="basic-settings">⚙️ Основные</button>
+          <button type="button" class="settings-nav-btn" data-panel="stations-management">📻 Станции</button>
+          <button type="button" class="settings-nav-btn" data-panel="automation">⏰ Автоматизация</button>
+          <button type="button" class="settings-nav-btn" data-panel="system">🔧 Система</button>
+        </div>
+
         <!-- Основные настройки -->
-        <div class="settings-accordion">
-          <div class="accordion-header" onclick="toggleAccordion('basic-settings')">
-            <h3>⚙️ Основные настройки</h3>
-            <span class="accordion-arrow">▼</span>
-          </div>
-          <div class="accordion-content" id="basic-settings">
+        <div class="settings-panel active" id="basic-settings">
             <div class="form-group">
               <label for="languageSelect">Язык интерфейса:</label>
               <select id="languageSelect">
-                <option value="ru">Русский</option>
+                <option value="auto">Авто (системный)</option>
                 <option value="en">English</option>
-                <option value="fr">Français</option>
+                <option value="ru">Русский</option>
+                <option value="lt">Lietuvių</option>
+                <option value="he">עברית</option>
               </select>
             </div>
             <div class="form-group">
@@ -230,16 +234,10 @@
             </div>
             <button id="saveSettingsBtn" class="btn btn-primary">Сохранить настройки</button>
             <div id="settingsMessage" class="message"></div>
-          </div>
         </div>
         
         <!-- Управление станциями -->
-        <div class="settings-accordion">
-          <div class="accordion-header" onclick="toggleAccordion('stations-management')">
-            <h3>📻 Управление станциями</h3>
-            <span class="accordion-arrow">▼</span>
-          </div>
-          <div class="accordion-content" id="stations-management">
+        <div class="settings-panel" id="stations-management">
             <div class="settings-section">
               <h3>Добавить станцию</h3>
           <div class="add-station-form" id="addStationForm">
@@ -316,16 +314,10 @@
                 <button id="loadDefaultStationsBtn" class="btn btn-secondary">🔄 Загрузить предустановленные станции</button>
               </div>
             </div>
-          </div>
         </div>
         
         <!-- Автоматизация -->
-        <div class="settings-accordion">
-          <div class="accordion-header" onclick="toggleAccordion('automation')">
-            <h3>⏰ Автоматизация</h3>
-            <span class="accordion-arrow">▼</span>
-          </div>
-          <div class="accordion-content" id="automation">
+        <div class="settings-panel" id="automation">
             <div class="settings-section">
               <h3>Таймер сна</h3>
               <p class="settings-description">Автоматически остановить воспроизведение через указанное время.</p>
@@ -356,16 +348,10 @@
                 <button id="addScheduleBtn" class="btn btn-primary">➕ Добавить расписание</button>
               </div>
             </div>
-          </div>
         </div>
         
         <!-- Система -->
-        <div class="settings-accordion">
-          <div class="accordion-header" onclick="toggleAccordion('system')">
-            <h3>🔧 Система</h3>
-            <span class="accordion-arrow">▼</span>
-          </div>
-          <div class="accordion-content" id="system">
+        <div class="settings-panel" id="system">
             <div class="settings-section">
               <h3>CatLu Radio</h3>
               <p class="settings-description">Плеер интернет-радио с поиском, избранным, историей и эквалайзером.</p>
@@ -382,7 +368,6 @@
               <p class="settings-description">Закрыть приложение и выйти.</p>
               <button id="exitAppBtn" class="btn btn-exit">🚪 Выход из приложения</button>
             </div>
-          </div>
         </div>
       </div>
     </div>
@@ -524,42 +509,31 @@
 
   <!-- Основной скрипт -->
   <script src="js/renderer.js?v=3.5.0"></script>
-  <!-- Функции для аккордеонов -->
+  <!-- Вкладки внутри настроек: панели вместо аккордеонов -->
   <script>
-    function toggleAccordion(id) {
-      const content = document.getElementById(id);
-      if (!content) return;
-      
-      const header = content.previousElementSibling;
-      
-      if (content.classList.contains('active')) {
-        content.classList.remove('active');
-        if (header) header.classList.remove('active');
-      } else {
-        // Закрыть все остальные аккордеоны
-        document.querySelectorAll('.accordion-content').forEach(acc => {
-          acc.classList.remove('active');
-          const accHeader = acc.previousElementSibling;
-          if (accHeader) accHeader.classList.remove('active');
-        });
-        // Открыть выбранный
-        content.classList.add('active');
-        if (header) header.classList.add('active');
-      }
+    // Показать выбранную панель настроек, скрыв остальные
+    function openSettingsPanel(id) {
+      const panel = document.getElementById(id);
+      if (!panel || !panel.classList.contains('settings-panel')) return;
+      document.querySelectorAll('.settings-panel').forEach(p => {
+        p.classList.toggle('active', p === panel);
+      });
+      document.querySelectorAll('.settings-nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.panel === id);
+      });
     }
-    
-    // Сделать функцию доступной глобально
+
+    // renderer.js вызывает toggleAccordion('...') — открываем нужную панель
+    function toggleAccordion(id) {
+      openSettingsPanel(id);
+    }
     window.toggleAccordion = toggleAccordion;
-    
-    // Открыть первый аккордеон по умолчанию
+
+    // Кнопки-вкладки внутри настроек
     document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        const firstAccordion = document.querySelector('.accordion-content');
-        if (firstAccordion) {
-          firstAccordion.classList.add('active');
-          firstAccordion.previousElementSibling.classList.add('active');
-        }
-      }, 100);
+      document.querySelectorAll('.settings-nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => openSettingsPanel(btn.dataset.panel));
+      });
     });
   </script>
   <!-- Мобильная версия: поддержка медиа-кнопок и нативных функций -->

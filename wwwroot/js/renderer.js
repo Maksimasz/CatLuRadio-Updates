@@ -18,7 +18,7 @@ let state = {
   scheduler: null, // Планировщик
   schedulerLastTrigger: {}, // Последние срабатывания планировщика (для избежания повторных запусков)
   settings: {
-    language: 'ru',
+    language: 'auto',
     minimizeToTray: true,
     startMinimized: false,
     editMode: false,
@@ -70,12 +70,36 @@ function clearLastStation() {
 }
 
 // Используем модуль переводов
-const t = (key) => {
+const t = (key, vars) => {
   if (window.TranslationManager) {
-    return window.TranslationManager.t(key);
+    return window.TranslationManager.t(key, vars);
   }
   return key;
 };
+
+// Перерисовка динамических текстов после смены языка: статика переведена
+// проходом по DOM, а списки и заголовки пересоздаются с новым языком.
+// Назначается TranslationManager.onApplied до старта init().
+function refreshLanguageUI() {
+  try {
+    loadStations();
+    renderFavorites();
+    renderHistory();
+    renderSchedules();
+    if (state.currentStation) updateNowPlaying(state.currentStation.name || '—');
+    updatePlayButton();
+    // Блок диагностики эквалайзера хранит сырой шаблон — перевыполняем его
+    const eqDebug = document.getElementById('equalizerDebug');
+    if (eqDebug && eqDebug.__i18n) {
+      eqDebug.textContent = t(eqDebug.__i18n.key, eqDebug.__i18n.vars);
+    }
+  } catch (e) {
+    console.error('[i18n] refreshLanguageUI:', e);
+  }
+}
+if (window.TranslationManager) {
+  window.TranslationManager.onApplied = refreshLanguageUI;
+}
 
 // Функция getDefaultStations() теперь находится в stations.js
 
@@ -94,6 +118,8 @@ function logError(message, error = null) {
 // диалогов, которые приходилось закрывать руками. Тост ничего не блокирует,
 // оформляется стилем приложения и сам исчезает.
 function showToast(message, type = 'info', durationMs = 0) {
+  // Локализация готового текста: статичные тосты переводятся автоматически
+  if (window.TranslationManager) message = window.TranslationManager.localize(message);
   const root = document.getElementById('toastRoot');
   if (!root) {
     // Контейнера ещё нет — сообщение не теряем, но и не падаем.
@@ -114,7 +140,7 @@ function showToast(message, type = 'info', durationMs = 0) {
   const close = document.createElement('button');
   close.type = 'button';
   close.className = 'toast__close';
-  close.setAttribute('aria-label', 'Закрыть уведомление');
+  close.setAttribute('aria-label', t('Закрыть уведомление'));
   close.textContent = '×';
   close.addEventListener('click', () => toast.remove());
   toast.appendChild(close);
@@ -531,7 +557,7 @@ function renderHistory() {
         </div>
         <div class="station-actions">
           <button class="btn-icon btn-favorite ${isFavorite(station.id) ? 'active' : ''}" 
-                  data-action="toggle-favorite" data-station-id="${escapeHtml(station.id)}" title="Избранное">
+                  data-action="toggle-favorite" data-station-id="${escapeHtml(station.id)}" title="${t('Избранное')}">
             ${isFavorite(station.id) ? '❤️' : '🤍'}
           </button>
         </div>
@@ -585,7 +611,9 @@ function initUI() {
   // Инициализировать часы
   initClock();
   
-  // Установить язык
+  // Установить язык ('auto' — определяется по системе; иное — по умолчанию auto)
+  const validLangs = ['auto', 'ru', 'en', 'lt', 'he'];
+  if (!validLangs.includes(state.settings.language)) state.settings.language = 'auto';
   document.getElementById('languageSelect').value = state.settings.language;
   if (window.TranslationManager) {
     window.TranslationManager.setLanguage(state.settings.language);
@@ -670,7 +698,7 @@ function renderStations(stations) {
   }
   
   if (!stations || stations.length === 0) {
-    container.innerHTML = '<p class="empty-message">Станции не найдены</p>';
+    container.innerHTML = `<p class="empty-message">${t('Станции не найдены')}</p>`;
     return;
   }
   
@@ -696,7 +724,7 @@ function renderStations(stations) {
   filtered = sortStations(filtered, sortType);
   
   if (filtered.length === 0) {
-    container.innerHTML = '<p class="empty-message">Станции не найдены</p>';
+    container.innerHTML = `<p class="empty-message">${t('Станции не найдены')}</p>`;
     return;
   }
   
@@ -710,16 +738,16 @@ function renderStations(stations) {
       <div class="station-actions">
         ${isUserStation(station.id) ? `
           <button class="btn-icon btn-edit" 
-                  data-action="edit-station" data-station-id="${escapeHtml(station.id)}" title="Редактировать">
+                  data-action="edit-station" data-station-id="${escapeHtml(station.id)}" title="${t('Редактировать')}">
             ✏️
           </button>
           <button class="btn-icon btn-delete" 
-                  data-action="delete-station" data-station-id="${escapeHtml(station.id)}" title="Удалить">
+                  data-action="delete-station" data-station-id="${escapeHtml(station.id)}" title="${t('Удалить')}">
             🗑️
           </button>
         ` : ''}
         <button class="btn-icon btn-favorite ${isFavorite(station.id) ? 'active' : ''}" 
-                data-action="toggle-favorite" data-station-id="${escapeHtml(station.id)}" title="Избранное">
+                data-action="toggle-favorite" data-station-id="${escapeHtml(station.id)}" title="${t('Избранное')}">
           ${isFavorite(station.id) ? '❤️' : '🤍'}
         </button>
       </div>
@@ -812,16 +840,16 @@ function renderFavorites() {
       <div class="station-actions">
         ${isUserStation(station.id) ? `
           <button class="btn-icon btn-edit" 
-                  data-action="edit-station" data-station-id="${escapeHtml(station.id)}" title="Редактировать">
+                  data-action="edit-station" data-station-id="${escapeHtml(station.id)}" title="${t('Редактировать')}">
             ✏️
           </button>
           <button class="btn-icon btn-delete" 
-                  data-action="delete-station" data-station-id="${escapeHtml(station.id)}" title="Удалить">
+                  data-action="delete-station" data-station-id="${escapeHtml(station.id)}" title="${t('Удалить')}">
             🗑️
           </button>
         ` : ''}
         <button class="btn-icon btn-favorite active" 
-                data-action="toggle-favorite" data-station-id="${escapeHtml(station.id)}" title="Избранное">
+                data-action="toggle-favorite" data-station-id="${escapeHtml(station.id)}" title="${t('Избранное')}">
           ❤️
         </button>
       </div>
@@ -1022,7 +1050,7 @@ async function playStation(station) {
   // Проверить валидность URL
   if (!station.url || !station.url.trim()) {
     state.isSwitching = false;
-    showToast('Ошибка: не указан URL станции', 'error');
+    showToast(t('Ошибка: не указан URL станции'), 'error');
     return;
   }
   
@@ -1036,7 +1064,7 @@ async function playStation(station) {
     new URL(streamUrl);
   } catch (e) {
     state.isSwitching = false;
-    showToast('Ошибка: неверный формат URL станции', 'error');
+    showToast(t('Ошибка: неверный формат URL станции'), 'error');
     return;
   }
 
@@ -1149,7 +1177,7 @@ function createStreamErrorHandler({ station, streamUrl, audioElement, contentTyp
       if (state.equalizer) state.equalizer.releaseSourceFor(audioElement);
       if (state.audio === audioElement) state.audio = null;
       state.isSwitching = false;
-      showToast('Станция играет без обработки звука:\nсервер не поддерживает режим CORS.', 'info');
+      showToast(t('Станция играет без обработки звука:\nсервер не поддерживает режим CORS.'), 'info');
       playStation(station).catch(err => console.error('Ошибка перезапуска станции без обработки:', err));
       return;
     }
@@ -1243,15 +1271,15 @@ function createStreamErrorHandler({ station, streamUrl, audioElement, contentTyp
     // Сбросить флаг переключения при ошибке
     state.isSwitching = false;
     
-    let userErrorMessage = 'Ошибка загрузки станции: ' + station.name;
+    let userErrorMessage = t('Ошибка загрузки станции: {name}', { name: station.name });
     if (errorCode === 2) {
-      userErrorMessage += '\nПроблема с сетью. Проверьте подключение к интернету.';
+      userErrorMessage += '\n' + t('Проблема с сетью. Проверьте подключение к интернету.');
     } else if (errorCode === 3) {
-      userErrorMessage += '\nОшибка декодирования аудио. Возможно, формат не поддерживается.';
+      userErrorMessage += '\n' + t('Ошибка декодирования аудио. Возможно, формат не поддерживается.');
     } else if (errorCode === 4) {
-      userErrorMessage += '\nПоток не удалось открыть или его формат не поддерживается.';
+      userErrorMessage += '\n' + t('Поток не удалось открыть или его формат не поддерживается.');
     } else {
-      userErrorMessage += '\nКод ошибки: ' + errorCode;
+      userErrorMessage += '\n' + t('Код ошибки: {code}', { code: errorCode });
       if (errorMessage) {
         userErrorMessage += '\n' + errorMessage;
       }
@@ -1265,7 +1293,7 @@ function createStreamErrorHandler({ station, streamUrl, audioElement, contentTyp
     updateNowPlaying('—');
     renderStations(state.stations);
     saveData();
-    showToast(userErrorMessage + '\n\nРабочий резервный поток не найден.', 'error');
+    showToast(userErrorMessage + '\n\n' + t('Рабочий резервный поток не найден.'), 'error');
   };
 }
 
@@ -1308,7 +1336,7 @@ function bindAudioElementEvents({ station, streamUrl, audioElement, contentType,
                 if (!state.isStopping && state.audio === audioElement && audioElement.readyState >= 2) {
                   audioElement.play().catch(retryError => {
                     console.error('Retry play error:', retryError);
-                    showToast('Ошибка воспроизведения: ' + station.name + '\nПроверьте URL потока.', 'error');
+                    showToast(t('Ошибка воспроизведения: {name}\nПроверьте URL потока.', { name: station.name }), 'error');
                     state.isPlaying = false;
       // Обновить медиа-сессию
       if ('mediaSession' in navigator) {
@@ -1322,7 +1350,7 @@ function bindAudioElementEvents({ station, streamUrl, audioElement, contentType,
                     updateNowPlaying('—');
                   });
                 } else {
-                  showToast('Ошибка воспроизведения: ' + station.name + '\nПоток не загружается.', 'error');
+                  showToast(t('Ошибка воспроизведения: {name}\nПоток не загружается.', { name: station.name }), 'error');
                   state.isPlaying = false;
       // Обновить медиа-сессию
       if ('mediaSession' in navigator) {
@@ -1344,9 +1372,9 @@ function bindAudioElementEvents({ station, streamUrl, audioElement, contentType,
               state.isPlaying = false;
               updatePlayButton();
               startAfterUserGesture(audioElement);
-              showToast('Автозапуск ждёт нажатия: ' + station.name + '\nНажмите в окне — станция продолжит.', 'info');
+              showToast(t('Автозапуск ждёт нажатия: {name}\nНажмите в окне — станция продолжит.', { name: station.name }), 'info');
             } else {
-              showToast('Ошибка воспроизведения: ' + station.name + '\n' + error.message, 'error');
+              showToast(t('Ошибка воспроизведения: {name}\n{message}', { name: station.name, message: error.message }), 'error');
               state.isPlaying = false;
       // Обновить медиа-сессию
       if ('mediaSession' in navigator) {
@@ -1532,10 +1560,10 @@ function setupHlsSession({ audioElement, streamUrl, station, useCrossfade, cross
           state.isSwitching = false;
           state.isPlaying = false;
           startAfterUserGesture(audioElement);
-          showToast('Автозапуск ждёт нажатия: ' + station.name + '\nНажмите в окне — станция продолжит.', 'info');
+          showToast(t('Автозапуск ждёт нажатия: {name}\nНажмите в окне — станция продолжит.', { name: station.name }), 'info');
           return;
         }
-        showToast('Ошибка воспроизведения HLS потока: ' + station.name, 'error');
+        showToast(t('Ошибка воспроизведения HLS потока: {name}', { name: station.name }), 'error');
         state.isPlaying = false;
     // Обновить медиа-сессию
     if ('mediaSession' in navigator) {
@@ -1567,7 +1595,7 @@ function setupHlsSession({ audioElement, streamUrl, station, useCrossfade, cross
         default:
           console.error('HLS fatal error, cannot recover');
           hls.destroy();
-          showToast('Ошибка загрузки HLS потока: ' + station.name + '\nФормат аудио не поддерживается.\n\nURL: ' + streamUrl, 'error');
+          showToast(t('Ошибка загрузки HLS потока: {name}\nФормат аудио не поддерживается.\n\nURL: {url}', { name: station.name, url: streamUrl }), 'error');
           state.isPlaying = false;
     // Обновить медиа-сессию
     if ('mediaSession' in navigator) {
@@ -1608,7 +1636,7 @@ async function playInBrowserPlayer({ station, streamUrl, useCrossfade, crossfade
     setupHlsSession({ audioElement, streamUrl, station, useCrossfade, crossfadeDuration });
   } else if (isHLS && !hlsSupported) {
     // HLS не поддерживается браузером
-    showToast('HLS потоки (m3u8) не поддерживаются в этом браузере.\n\nПопробуйте использовать другой поток или обновить браузер.', 'error');
+    showToast(t('HLS потоки (m3u8) не поддерживаются в этом браузере.\n\nПопробуйте использовать другой поток или обновить браузер.'), 'error');
     state.isSwitching = false;
     return;
   }
@@ -1695,7 +1723,7 @@ async function playInBrowserPlayer({ station, streamUrl, useCrossfade, crossfade
     state.isSwitching = false;
   } catch (e) {
     console.error('Ошибка при загрузке аудио:', e);
-    showToast('Ошибка при загрузке станции: ' + station.name, 'error');
+    showToast(t('Ошибка при загрузке станции: {name}', { name: station.name }), 'error');
     state.audio = null;
     state.currentStation = null;
     state.isSwitching = false;
@@ -1826,13 +1854,13 @@ function updatePlayButton() {
     if (pauseIcon) pauseIcon.style.display = 'inline-block';
     if (miniPlayIcon) miniPlayIcon.style.display = 'none';
     if (miniPauseIcon) miniPauseIcon.style.display = 'inline-block';
-    if (btn) btn.title = 'Пауза';
+    if (btn) btn.title = t('Пауза');
   } else {
     if (playIcon) playIcon.style.display = 'inline-block';
     if (pauseIcon) pauseIcon.style.display = 'none';
     if (miniPlayIcon) miniPlayIcon.style.display = 'inline-block';
     if (miniPauseIcon) miniPauseIcon.style.display = 'none';
-    if (btn) btn.title = 'Воспроизвести';
+    if (btn) btn.title = t('Воспроизвести');
   }
 
   const hasAudio = Boolean(state.audio || state.nativeAudio);
@@ -1855,8 +1883,8 @@ function updateNowPlaying(stationName) {
     try {
       const station = state.currentStation;
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: station.name || stationName || 'Радиостанция',
-        artist: station.genre || 'Интернет-радио',
+        title: station.name || stationName || t('Радиостанция'),
+        artist: station.genre || t('Интернет-радио'),
         album: 'CatLu Radio',
         artwork: station.image ? [
           { src: station.image, sizes: '512x512', type: 'image/png' }
@@ -2005,10 +2033,9 @@ function isUserStation(stationId) {
 
 // Используем модуль названий стран
 function getCountryName(code) {
-  if (window.CountryNames) {
-    return window.CountryNames.getName(code);
-  }
-  return code;
+  const name = window.CountryNames ? window.CountryNames.getName(code) : code;
+  // CountryNames хранит русские названия — переводим через словарь
+  return t(name);
 }
 
 // «Имя портала» станции — строка под названием, всегда строчными буквами.
@@ -2026,7 +2053,7 @@ async function checkAllStations() {
   if (button.dataset.busy === 'true') return;
   button.dataset.busy = 'true';
   button.setAttribute('aria-disabled', 'true');
-  status.textContent = 'Проверка…';
+  status.textContent = t('Проверка…');
   let working = 0;
   await Promise.all(state.stations.map(async station => {
     const result = await window.AppAPI.checkStream(station.url);
@@ -2040,7 +2067,7 @@ async function checkAllStations() {
   }));
   await window.AppAPI.saveStations(state.stations);
   renderStations(state.stations);
-  status.textContent = `Работают ${working} из ${state.stations.length}`;
+  status.textContent = t('Работают {working} из {total}', { working: working, total: state.stations.length });
   button.dataset.busy = 'false';
   button.removeAttribute('aria-disabled');
 }
@@ -2050,28 +2077,28 @@ async function checkForUpdates() {
   const status = document.getElementById('updateStatus');
   const install = document.getElementById('installUpdateBtn');
   if (!status || !install) return;
-  status.textContent = 'Проверка обновлений…';
+  status.textContent = t('Проверка обновлений…');
   install.style.display = 'none';
   const result = await window.AppAPI.checkForUpdate();
   if (!result?.success) {
-    status.textContent = 'Не удалось проверить обновления.';
+    status.textContent = t('Не удалось проверить обновления.');
     return;
   }
   if (!result.hasUpdate || !result.url) {
-    status.textContent = 'Установлена последняя версия.';
+    status.textContent = t('Установлена последняя версия.');
     return;
   }
   availableUpdate = result;
-  status.textContent = `Доступна версия ${result.version}.`;
-  install.textContent = `Обновить до ${result.version}`;
+  status.textContent = t('Доступна версия {version}.', { version: result.version });
+  install.textContent = t('Обновить до {version}', { version: result.version });
   install.style.display = 'inline-block';
 }
 
 async function installAvailableUpdate() {
-  if (!availableUpdate?.url || !confirm(`Скачать и установить версию ${availableUpdate.version}?`)) return;
-  document.getElementById('updateStatus').textContent = 'Скачивание установщика…';
+  if (!availableUpdate?.url || !confirm(t('Скачать и установить версию {version}?', { version: availableUpdate.version }))) return;
+  document.getElementById('updateStatus').textContent = t('Скачивание установщика…');
   const result = await window.AppAPI.installUpdate(availableUpdate.url);
-  if (!result?.success) document.getElementById('updateStatus').textContent = 'Не удалось запустить обновление.';
+  if (!result?.success) document.getElementById('updateStatus').textContent = t('Не удалось запустить обновление.');
 }
 
 async function searchOnlineStations() {
@@ -2081,12 +2108,12 @@ async function searchOnlineStations() {
   const results = document.getElementById('onlineResults');
   if (!query && country === 'all' && portal === 'all') {
     results.hidden = false;
-    results.textContent = 'Введите название, стиль, исполнителя, годы или выберите страну.';
+    results.textContent = t('Введите название, стиль, исполнителя, годы или выберите страну.');
     return;
   }
 
   results.hidden = false;
-  results.textContent = 'Поиск…';
+  results.textContent = t('Поиск…');
   let stations = await window.AppAPI.searchOnlineStations(query, country === 'all' ? '' : country, portal);
   stations = stations.filter(s => s.lastcheckok === 1);
   const uniqueStations = new Map();
@@ -2099,7 +2126,7 @@ async function searchOnlineStations() {
   stations = [...uniqueStations.values()];
   results.replaceChildren();
   if (!stations.length) {
-    results.textContent = 'Работающие станции не найдены.';
+    results.textContent = t('Работающие станции не найдены.');
     return;
   }
 
@@ -2132,18 +2159,18 @@ async function searchOnlineStations() {
     const indicator = document.createElement('span');
     indicator.className = 'play-ind';
     indicator.textContent = '▶';
-    indicator.title = 'Прослушать';
+    indicator.title = t('Прослушать');
 
     const add = document.createElement('button');
     add.type = 'button';
     add.className = 'online-add';
-    add.title = 'Добавить в плейлист';
+    add.title = t('Добавить в плейлист');
     add.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>';
     const markAdded = () => {
       row.classList.add('in-playlist');
       add.classList.add('added');
       add.disabled = true;
-      add.title = 'Уже в плейлисте';
+      add.title = t('Уже в плейлисте');
       add.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
     };
     if (isInPlaylist(found)) markAdded();
@@ -2366,7 +2393,7 @@ function setupEventListeners() {
     if (editingId) {
       await updateStation(editingId);
     } else {
-      showToast('Ошибка: не выбрана станция для редактирования', 'error');
+      showToast(t('Ошибка: не выбрана станция для редактирования'), 'error');
     }
   });
   
@@ -2397,7 +2424,6 @@ function setupEventListeners() {
     state.settings.language = e.target.value;
     if (window.TranslationManager) {
       window.TranslationManager.setLanguage(e.target.value);
-      window.TranslationManager.applyTranslations();
     } else {
       applyTranslations();
     }
@@ -2424,7 +2450,7 @@ function setupEventListeners() {
   const clearHistoryBtn = document.getElementById('clearHistoryBtn');
   if (clearHistoryBtn) {
     clearHistoryBtn.addEventListener('click', () => {
-      if (confirm('Вы уверены, что хотите очистить историю прослушанных станций?')) {
+      if (confirm(t('Вы уверены, что хотите очистить историю прослушанных станций?'))) {
         clearHistory();
       }
     });
@@ -2550,7 +2576,7 @@ function setupEventListeners() {
         await window.AppAPI.exitApp();
       } else {
         // Fallback для веб-версии
-        if (confirm('Вы уверены, что хотите закрыть приложение?')) {
+        if (confirm(t('Вы уверены, что хотите закрыть приложение?'))) {
           window.close();
         }
       }
@@ -2565,7 +2591,7 @@ function setupEventListeners() {
         await window.AppAPI.exitApp();
       } else {
         // Fallback для веб-версии
-        if (confirm('Вы уверены, что хотите закрыть приложение?')) {
+        if (confirm(t('Вы уверены, что хотите закрыть приложение?'))) {
           window.close();
         }
       }
@@ -2577,10 +2603,17 @@ function setupEventListeners() {
 }
 
 // Показать отладочную информацию в интерфейсе
-function showEqualizerDebug(message, isError = false) {
+function showEqualizerDebug(message, isError = false, vars = null) {
   const debugEl = document.getElementById('equalizerDebug');
   if (debugEl) {
-    debugEl.textContent = message;
+    // message — русский шаблон (ключ словаря, {placeholder} подставляются из
+    // vars). Храним его на элементе, чтобы перевести блок заново при смене
+    // языка (см. refreshLanguageUI): сам текст с подставленным числом ключом
+    // словаря уже не является.
+    debugEl.__i18n = { key: message, vars };
+    debugEl.textContent = window.TranslationManager
+      ? window.TranslationManager.t(message, vars)
+      : message;
     debugEl.style.display = 'block';
     debugEl.style.background = isError ? 'rgba(255, 0, 0, 0.1)' : 'rgba(0, 255, 0, 0.1)';
     debugEl.style.borderColor = isError ? 'rgba(255, 0, 0, 0.3)' : 'rgba(0, 255, 0, 0.3)';
@@ -2698,14 +2731,14 @@ function initEqualizer() {
   
   if (createdSliders.length === 0) {
     showEqualizerDebug('ОШИБКА: Слайдеры не были созданы! Проверьте код создания элементов.', true);
-    bandsContainer.innerHTML = '<p style="color: red; padding: 16px; text-align: center;">Ошибка создания эквалайзера. Слайдеры не были созданы.</p>';
+    bandsContainer.innerHTML = `<p style="color: red; padding: 16px; text-align: center;">${t('Ошибка создания эквалайзера. Слайдеры не были созданы.')}</p>`;
     return;
   }
   
   if (createdSliders.length !== frequencies.length) {
-    showEqualizerDebug(`ВНИМАНИЕ: Создано ${createdSliders.length} слайдеров из ${frequencies.length}`, false);
+    showEqualizerDebug('ВНИМАНИЕ: Создано {created} слайдеров из {total}', false, { created: createdSliders.length, total: frequencies.length });
   } else {
-    showEqualizerDebug(`Успешно создано ${createdSliders.length} полос эквалайзера ✓`, false);
+    showEqualizerDebug('Успешно создано {count} полос эквалайзера ✓', false, { count: createdSliders.length });
   }
   
   // Скрыть отладочную информацию если все успешно
@@ -2843,7 +2876,7 @@ function applyAudioProcessingChange() {
   if (wanted && state.isPlaying && state.currentStation) {
     // Поток уже известен как «без CORS» — перезапуск не поможет
     if (state.streamsWithoutWebAudio.has(state.currentStation.url)) {
-      showToast('Для этой станции обработка звука недоступна:\nсервер не отдаёт CORS-заголовки.', 'info');
+      showToast(t('Для этой станции обработка звука недоступна:\nсервер не отдаёт CORS-заголовки.'), 'info');
       return;
     }
     // Быстро гасим текущий элемент и перезапускаем станцию через playStation
@@ -2903,7 +2936,7 @@ async function addStation() {
   const messageEl = document.getElementById('addStationMessage');
   
   if (!name || !url) {
-    messageEl.textContent = t('stationError');
+    messageEl.textContent = t('Ошибка: заполните все поля');
     messageEl.className = 'message error';
     return;
   }
@@ -2912,7 +2945,7 @@ async function addStation() {
   try {
     new URL(url);
   } catch (e) {
-    messageEl.textContent = 'Ошибка: неверный URL';
+    messageEl.textContent = t('Ошибка: неверный URL');
     messageEl.className = 'message error';
     return;
   }
@@ -2929,7 +2962,7 @@ async function addStation() {
   
   try {
     await saveData();
-    messageEl.textContent = t('stationAdded');
+    messageEl.textContent = t('Станция успешно добавлена!');
     messageEl.className = 'message success';
     
     // Очистить форму
@@ -2945,7 +2978,7 @@ async function addStation() {
     }, 3000);
   } catch (error) {
     console.error('Ошибка сохранения:', error);
-    messageEl.textContent = 'Ошибка при сохранении станции: ' + error.message;
+    messageEl.textContent = t('Ошибка при сохранении станции: {error}', { error: error.message });
     messageEl.className = 'message error';
   }
 }
@@ -2955,7 +2988,7 @@ function editStation(stationId) {
   const station = state.stations.find(s => s.id === stationId);
   
   if (!station) {
-    showToast('Станция не найдена', 'error');
+    showToast(t('Станция не найдена'), 'error');
     return;
   }
   
@@ -2980,24 +3013,13 @@ function editStation(stationId) {
   // Переключиться на вкладку настроек
   switchTab('settings');
   
-  // Раскрыть аккордеон "Управление станциями" и прокрутить к форме
+  // Открыть панель «Станции» в настройках и прокрутить к форме
   setTimeout(() => {
-    const accordionContent = document.getElementById('stations-management');
-    if (accordionContent) {
-      // Проверить, раскрыт ли аккордеон (проверяем класс active)
-      const isExpanded = accordionContent.classList.contains('active');
-      if (!isExpanded) {
-        // Раскрыть аккордеон через глобальную функцию toggleAccordion
-        if (typeof window.toggleAccordion === 'function') {
-          window.toggleAccordion('stations-management');
-        } else {
-          // Если функция не доступна глобально, используем прямую логику
-          accordionContent.classList.add('active');
-          const header = accordionContent.previousElementSibling;
-          if (header) {
-            header.classList.add('active');
-          }
-        }
+    const panel = document.getElementById('stations-management');
+    if (panel) {
+      // Открыть панель «Станции» (вместо старого аккордеона)
+      if (typeof window.toggleAccordion === 'function') {
+        window.toggleAccordion('stations-management');
       }
       
       // Прокрутить к форме
@@ -3025,7 +3047,7 @@ async function updateStation(stationId) {
   const messageEl = document.getElementById('addStationMessage');
   
   if (!name || !url) {
-    messageEl.textContent = t('stationError');
+    messageEl.textContent = t('Ошибка: заполните все поля');
     messageEl.className = 'message error';
     return;
   }
@@ -3034,7 +3056,7 @@ async function updateStation(stationId) {
   try {
     new URL(url);
   } catch (e) {
-    messageEl.textContent = 'Ошибка: неверный URL';
+    messageEl.textContent = t('Ошибка: неверный URL');
     messageEl.className = 'message error';
     return;
   }
@@ -3067,7 +3089,7 @@ async function updateStation(stationId) {
     await saveData();
     // Станции сохранены
     
-    messageEl.textContent = 'Станция успешно обновлена и сохранена!';
+    messageEl.textContent = t('Станция успешно обновлена и сохранена!');
     messageEl.className = 'message success';
     
     // Очистить форму
@@ -3083,7 +3105,7 @@ async function updateStation(stationId) {
     }, 3000);
   } catch (error) {
     console.error('Ошибка сохранения:', error);
-    messageEl.textContent = 'Ошибка при сохранении станции: ' + error.message;
+    messageEl.textContent = t('Ошибка при сохранении станции: {error}', { error: error.message });
     messageEl.className = 'message error';
   }
 }
@@ -3091,7 +3113,7 @@ async function updateStation(stationId) {
 // Удаление станции
 async function deleteStation(stationId) {
   // Подтверждение удаления
-  if (!confirm('Вы уверены, что хотите удалить эту станцию?')) {
+  if (!confirm(t('Вы уверены, что хотите удалить эту станцию?'))) {
     return;
   }
   
@@ -3099,7 +3121,7 @@ async function deleteStation(stationId) {
   const stationIndex = state.stations.findIndex(s => s.id === stationId);
   
   if (stationIndex === -1) {
-    showToast('Станция не найдена', 'error');
+    showToast(t('Станция не найдена'), 'error');
     return;
   }
   
@@ -3126,7 +3148,7 @@ async function deleteStation(stationId) {
     loadStations();
   } catch (error) {
     console.error('Ошибка при удалении станции:', error);
-    showToast('Ошибка при удалении станции: ' + error.message, 'error');
+    showToast(t('Ошибка при удалении станции: {error}', { error: error.message }), 'error');
   }
 }
 
@@ -3194,7 +3216,7 @@ function saveSettings() {
   loadStations();
   
   const messageEl = document.getElementById('settingsMessage');
-  messageEl.textContent = t('settingsSaved');
+  messageEl.textContent = t('Настройки сохранены!');
   messageEl.className = 'message success';
   
   setTimeout(() => {
@@ -3255,7 +3277,7 @@ function setupIPCListeners() {
   });
   
   register('onShowAbout', () => {
-    showToast('CatLu Radio v3.5.0\n\nПриложение для прослушивания интернет-радио.', 'info');
+    showToast(t('CatLu Radio v3.5.0\n\nПриложение для прослушивания интернет-радио.'), 'info');
   });
   
   // При выгрузке страницы помечаем закрытие: stopPlay() в этом случае не
@@ -3273,13 +3295,13 @@ async function exportStations() {
     const result = await window.AppAPI.exportStations(state.stations);
     
     if (result.success) {
-      showToast(`Станции успешно экспортированы в файл:\n${result.path}`, 'success');
+      showToast(t('Станции успешно экспортированы в файл:\n{path}', { path: result.path }), 'success');
     } else if (!result.canceled) {
-      showToast(`Ошибка экспорта: ${result.error || 'Неизвестная ошибка'}`, 'error');
+      showToast(t('Ошибка экспорта: {error}', { error: result.error || t('Неизвестная ошибка') }), 'error');
     }
   } catch (error) {
     console.error('Export error:', error);
-    showToast('Ошибка при экспорте станций', 'error');
+    showToast(t('Ошибка при экспорте станций'), 'error');
   }
 }
 
@@ -3289,20 +3311,20 @@ async function importStations() {
     const result = await window.AppAPI.importStations();
     
     if (result.success) {
-      let message = `Импортировано станций: ${result.imported}\nВсего станций: ${result.total}`;
+      let message = t('Импортировано станций: {imported}\nВсего станций: {total}', { imported: result.imported, total: result.total });
       if (result.skipped && result.skipped > 0) {
-        message += `\nПропущено дубликатов: ${result.skipped}`;
+        message += '\n' + t('Пропущено дубликатов: {skipped}', { skipped: result.skipped });
       }
       showToast(message, 'success');
       // Перезагрузить данные и обновить список
       await loadData();
       loadStations();
     } else if (!result.canceled) {
-      showToast(`Ошибка импорта: ${result.error || 'Неизвестная ошибка'}`, 'error');
+      showToast(t('Ошибка импорта: {error}', { error: result.error || t('Неизвестная ошибка') }), 'error');
     }
   } catch (error) {
     console.error('Import error:', error);
-    showToast('Ошибка при импорте станций. Проверьте формат файла.', 'error');
+    showToast(t('Ошибка при импорте станций. Проверьте формат файла.'), 'error');
   }
 }
 
@@ -3313,12 +3335,12 @@ async function extractTuneInStream() {
   const tuneInUrl = urlInput.value.trim();
   
   if (!tuneInUrl) {
-    messageEl.textContent = 'Введите URL TuneIn или iframe код';
+    messageEl.textContent = t('Введите URL TuneIn или iframe код');
     messageEl.className = 'message error';
     return;
   }
   
-  messageEl.textContent = 'Извлечение потока из TuneIn...';
+  messageEl.textContent = t('Извлечение потока из TuneIn...');
   messageEl.className = 'message';
   
   try {
@@ -3332,7 +3354,7 @@ async function extractTuneInStream() {
         document.getElementById('stationName').value = result.stationName;
       }
       
-      messageEl.textContent = 'Поток успешно извлечен из TuneIn!';
+      messageEl.textContent = t('Поток успешно извлечен из TuneIn!');
       messageEl.className = 'message success';
       
       setTimeout(() => {
@@ -3340,12 +3362,12 @@ async function extractTuneInStream() {
         messageEl.className = 'message';
       }, 3000);
     } else {
-      messageEl.textContent = result.error || 'Не удалось извлечь поток. Возможно, станция недоступна или требует авторизации.';
+      messageEl.textContent = result.error || t('Не удалось извлечь поток. Возможно, станция недоступна или требует авторизации.');
       messageEl.className = 'message error';
     }
   } catch (error) {
     console.error('Ошибка извлечения потока:', error);
-    messageEl.textContent = 'Ошибка при извлечении потока: ' + error.message;
+    messageEl.textContent = t('Ошибка при извлечении потока: {error}', { error: error.message });
     messageEl.className = 'message error';
   }
 }
@@ -3357,18 +3379,18 @@ async function extractRadioPotokStream() {
   const radiopotokUrl = urlInput.value.trim();
   
   if (!radiopotokUrl) {
-    messageEl.textContent = 'Введите URL скрипта RadioPotok (например: https://radiopotok.ru/f/script6.1/4.js)';
+    messageEl.textContent = t('Введите URL скрипта RadioPotok (например: https://radiopotok.ru/f/script6.1/4.js)');
     messageEl.className = 'message error';
     return;
   }
   
   if (!radiopotokUrl.includes('radiopotok.ru')) {
-    messageEl.textContent = 'URL должен содержать radiopotok.ru';
+    messageEl.textContent = t('URL должен содержать radiopotok.ru');
     messageEl.className = 'message error';
     return;
   }
   
-  messageEl.textContent = 'Извлечение потока из RadioPotok...';
+  messageEl.textContent = t('Извлечение потока из RadioPotok...');
   messageEl.className = 'message';
   
   try {
@@ -3382,7 +3404,7 @@ async function extractRadioPotokStream() {
         document.getElementById('stationName').value = result.stationName;
       }
       
-      messageEl.textContent = 'Поток успешно извлечен из RadioPotok!';
+      messageEl.textContent = t('Поток успешно извлечен из RadioPotok!');
       messageEl.className = 'message success';
       
       setTimeout(() => {
@@ -3390,12 +3412,12 @@ async function extractRadioPotokStream() {
         messageEl.className = 'message';
       }, 3000);
     } else {
-      messageEl.textContent = result.error || 'Не удалось извлечь поток. Возможно, станция недоступна или использует защищенный поток.';
+      messageEl.textContent = result.error || t('Не удалось извлечь поток. Возможно, станция недоступна или использует защищенный поток.');
       messageEl.className = 'message error';
     }
   } catch (error) {
     console.error('Ошибка извлечения потока:', error);
-    messageEl.textContent = 'Ошибка при извлечении потока: ' + error.message;
+    messageEl.textContent = t('Ошибка при извлечении потока: {error}', { error: error.message });
     messageEl.className = 'message error';
   }
 }
@@ -3430,7 +3452,7 @@ function startSleepTimer(durationMinutes) {
     const seconds = Math.floor((remaining % 60000) / 1000);
     
     if (sleepTimerStatus) {
-      sleepTimerStatus.textContent = `Остановка через: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+      sleepTimerStatus.textContent = t('Остановка через: {time}', { time: `${minutes}:${seconds.toString().padStart(2, '0')}` });
       sleepTimerStatus.style.display = 'block';
       sleepTimerStatus.className = 'message';
     }
@@ -3439,7 +3461,7 @@ function startSleepTimer(durationMinutes) {
       stopSleepTimer();
       stopPlay();
       if (sleepTimerStatus) {
-        sleepTimerStatus.textContent = 'Таймер сработал. Воспроизведение остановлено.';
+        sleepTimerStatus.textContent = t('Таймер сработал. Воспроизведение остановлено.');
         sleepTimerStatus.className = 'message success';
       }
     } else {
@@ -3558,17 +3580,17 @@ function renderSchedules() {
   if (!container) return;
   
   if (!state.settings.scheduler?.schedules || state.settings.scheduler.schedules.length === 0) {
-    container.innerHTML = '<p style="color: var(--md-on-surface-variant); margin: 10px 0;">Нет расписаний. Добавьте новое расписание.</p>';
+    container.innerHTML = `<p style="color: var(--md-on-surface-variant); margin: 10px 0;">${t('Нет расписаний. Добавьте новое расписание.')}</p>`;
     return;
   }
   
   container.innerHTML = state.settings.scheduler.schedules.map((schedule, index) => {
     const station = state.stations.find(s => s.id === schedule.stationId);
-    const stationName = station ? station.name : `Станция ${schedule.stationId}`;
-    const daysNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const stationName = station ? station.name : t('Станция {id}', { id: schedule.stationId });
+    const daysNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'].map(d => t(d));
     const daysStr = schedule.days && schedule.days.length > 0 
       ? schedule.days.map(d => daysNames[d]).join(', ')
-      : 'Каждый день';
+      : t('Каждый день');
     
     return `
       <div class="schedule-item" style="border: 1px solid var(--md-outline-variant); border-radius: 8px; padding: 12px; margin-bottom: 10px; background: var(--md-surface-container-low);">
@@ -3576,10 +3598,10 @@ function renderSchedules() {
           <div style="flex: 1;">
             <div style="font-weight: 500; margin-bottom: 5px;">${escapeHtml(stationName)}</div>
             <div style="font-size: 0.9em; color: var(--md-on-surface-variant);">
-              Время: ${escapeHtml(schedule.time)} | Дни: ${escapeHtml(daysStr)}
+              ${t('Время: {time} | Дни: {days}', { time: escapeHtml(schedule.time), days: escapeHtml(daysStr) })}
             </div>
             <div style="font-size: 0.85em; color: var(--md-on-surface-variant); margin-top: 5px;">
-              Статус: ${schedule.enabled ? '✅ Включено' : '❌ Выключено'}
+              ${t('Статус: {status}', { status: schedule.enabled ? t('✅ Включено') : t('❌ Выключено') })}
             </div>
           </div>
           <div style="display: flex; gap: 5px;">
@@ -3612,7 +3634,7 @@ window.editSchedule = function(index) {
 };
 
 window.deleteSchedule = function(index) {
-  if (!state.settings.scheduler?.schedules?.[index] || !confirm('Удалить это расписание?')) return;
+  if (!state.settings.scheduler?.schedules?.[index] || !confirm(t('Удалить это расписание?'))) return;
   state.settings.scheduler.schedules.splice(index, 1);
   saveData();
   renderSchedules();
@@ -3649,7 +3671,7 @@ function openScheduleModal(editIndex = null) {
   }
   
   // Заполнить список станций
-  stationSelect.innerHTML = '<option value="">Выберите станцию...</option>';
+  stationSelect.innerHTML = `<option value="">${t('Выберите станцию...')}</option>`;
   state.stations.forEach(station => {
     const option = document.createElement('option');
     option.value = station.id;
@@ -3661,7 +3683,7 @@ function openScheduleModal(editIndex = null) {
   if (editIndex !== null && editIndex !== undefined) {
     const schedule = state.settings.scheduler.schedules[editIndex];
     if (schedule) {
-      title.textContent = 'Редактировать расписание';
+      title.textContent = t('Редактировать расписание');
       stationSelect.value = schedule.stationId;
       
       // Преобразовать время из формата HH:MM в формат для input[type="time"]
@@ -3677,7 +3699,7 @@ function openScheduleModal(editIndex = null) {
       editingIndexInput.value = editIndex;
     }
   } else {
-    title.textContent = 'Добавить расписание';
+    title.textContent = t('Добавить расписание');
     stationSelect.value = '';
     timeInput.value = '';
     document.querySelectorAll('.day-checkbox').forEach(checkbox => {
@@ -3712,7 +3734,7 @@ function saveSchedule() {
   // Валидация
   if (!stationId) {
     if (messageEl) {
-      messageEl.textContent = 'Выберите станцию';
+      messageEl.textContent = t('Выберите станцию');
       messageEl.className = 'message error';
       messageEl.style.display = 'block';
     }
@@ -3721,7 +3743,7 @@ function saveSchedule() {
   
   if (!time) {
     if (messageEl) {
-      messageEl.textContent = 'Введите время включения';
+      messageEl.textContent = t('Введите время включения');
       messageEl.className = 'message error';
       messageEl.style.display = 'block';
     }

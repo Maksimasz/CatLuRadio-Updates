@@ -217,7 +217,7 @@ window.AppAPI = {
     getFavorites: () => WebView2API.get('favorites', []),
     saveFavorites: (f) => WebView2API.set('favorites', f),
     getSettings: () => WebView2API.get('settings', {
-        language: 'ru',
+        language: 'auto',
         volume: 0.5,
         minimizeToTray: true,
         theme: 'system',

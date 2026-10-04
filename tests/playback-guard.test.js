@@ -30,7 +30,7 @@ if (!source.includes('state.audio || state.nativeAudio')) throw new Error('Кн�
 if (!source.includes('setInterval(checkAllStations, 15 * 60 * 1000)')) throw new Error('Нет автоматической проверки станций');
 if (!source.includes("searchOnlineStations(query, country === 'all' ? '' : country, portal)")) throw new Error('Портал не передаётся в интернет-поиск');
 if (!source.includes("preview: true") || !source.includes("!station.preview")) throw new Error('Предпрослушивание не отделено от добавления');
-if (!source.includes("!state.settings.scheduler?.schedules?.[index] || !confirm('Удалить это расписание?')")) throw new Error('Удаление расписания не подтверждается');
+if (!source.includes("!state.settings.scheduler?.schedules?.[index] || !confirm(t('Удалить это расписание?'))")) throw new Error('Удаление расписания не подтверждается');
 // Мост событий C#→страницы не существует (MainForm шлёт только ответы по
 // callbackId), поэтому прямой вызов window.AppAPI.on* роняет init() дальше:
 // без перевоводов, проверки обновлений и автозапуска последней станции.
