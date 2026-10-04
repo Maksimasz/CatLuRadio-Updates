@@ -234,4 +234,4 @@
 - README переписан: баннер с иконкой и бейджами, галерея из 5 скриншотов, подробный раздел возможностей, языки, установка, запуск из исходников, тесты, структура проекта.
 - Скриншоты сняты headless-съёмкой через CDP (Edge headless + Node WebSocket) и сохранены в `docs/screenshots/` (2720 px по ширине): главный экран, локальный поиск, эквалайзер, настройки, English + светлая тема, иврит RTL.
 - Проверено: 5/5 node-тестов, `dotnet build` (Debug) и `dotnet publish -c Release`; готовый установщик — `release/CatLuRadio-3.5.1-Standalone-Setup-desktop.exe` (357 533 633 байт, SHA-256 `2881A35BA9FD60D5B6CA14B47F5BEE0166BE44E8B652AA2600695077E429F541`).
-- Релиз `v3.5.1`: `https://github.com/Maksimasz/CatLuRadio-Updates/releases/tag/v3.5.1`; установщик загружается ассетом релиза.
+- Опубликован релиз `v3.5.1`: `https://github.com/Maksimasz/CatLuRadio-Updates/releases/tag/v3.5.1`; установщик `CatLuRadio-3.5.1-Standalone-Setup-desktop.exe` (357 533 633 байт) загружен ассетом, SHA-256 ассета совпал с локальным файлом.
