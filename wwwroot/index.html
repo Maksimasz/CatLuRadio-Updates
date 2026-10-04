@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CatLu Radio</title>
+  <title>CatLu Radio NET</title>
   <link rel="stylesheet" href="styles.css">
   <script>
     console.log('=== HTML ЗАГРУЖЕН ===');
     console.log('Время:', new Date().toLocaleTimeString());
   </script>
   <!-- WebView2 API -->
-  <script src="js/api-adapter.js?v=3.5.0"></script>
+  <script src="js/api-adapter.js?v=3.5.1"></script>
   <!-- HLS.js для поддержки HLS потоков (m3u8) -->
   <script src="js/hls.min.js"></script>
 </head>
@@ -18,7 +18,7 @@
   <div class="container">
     <header class="header">
       <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <h1>📻 CatLu Radio</h1>
+        <h1>📻 CatLu Radio NET</h1>
         <div id="clock" class="clock" style="font-size: 14px; font-weight: 500; opacity: 0.9;"></div>
       </div>
       <div class="controls">
@@ -353,7 +353,7 @@
         <!-- Система -->
         <div class="settings-panel" id="system">
             <div class="settings-section">
-              <h3>CatLu Radio</h3>
+              <h3>CatLu Radio NET</h3>
               <p class="settings-description">Плеер интернет-радио с поиском, избранным, историей и эквалайзером.</p>
               <a class="btn btn-secondary" href="https://github.com/Maksimasz/CatLuRadio-Updates" target="_blank" rel="noopener">GitHub и обновления</a>
             </div>
@@ -508,7 +508,7 @@
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
 
   <!-- Основной скрипт -->
-  <script src="js/renderer.js?v=3.5.0"></script>
+  <script src="js/renderer.js?v=3.5.1"></script>
   <!-- Вкладки внутри настроек: панели вместо аккордеонов -->
   <script>
     // Показать выбранную панель настроек, скрыв остальные

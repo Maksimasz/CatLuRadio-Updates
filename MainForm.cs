@@ -84,7 +84,7 @@ namespace CatLuRadio
                 webView = new WebView2 { Dock = DockStyle.Fill };
                 this.ClientSize = new Size(688, 688);
                 this.MinimumSize = new Size(500, 500);
-                this.Text = $"CatLu Radio v{Application.ProductVersion}";
+                this.Text = $"CatLu Radio NET v{Application.ProductVersion}";
                 this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
                 this.StartPosition = FormStartPosition.CenterScreen;
                 this.FormBorderStyle = FormBorderStyle.Sizable;

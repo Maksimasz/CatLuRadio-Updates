@@ -1,4 +1,4 @@
-// WebView2 API адаптер для CatLu Radio
+// WebView2 API адаптер для CatLu Radio NET
 console.log('[WebView2 API] Загрузка...');
 console.log('[WebView2 API] window.chrome:', !!window.chrome);
 console.log('[WebView2 API] window.chrome.webview:', !!window.chrome?.webview);

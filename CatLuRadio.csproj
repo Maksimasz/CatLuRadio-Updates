@@ -11,16 +11,16 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>CatLuRadio</AssemblyName>
     <RootNamespace>CatLuRadio</RootNamespace>
-    <Version>3.5.0</Version>
-    <AssemblyVersion>3.5.0.0</AssemblyVersion>
-    <FileVersion>3.5.0.0</FileVersion>
-    <!-- SDK дописывает хеш коммита к InformationalVersion (3.5.0+abcdef...).
+    <Version>3.5.1</Version>
+    <AssemblyVersion>3.5.1.0</AssemblyVersion>
+    <FileVersion>3.5.1.0</FileVersion>
+    <!-- SDK дописывает хеш коммита к InformationalVersion (3.5.1+abcdef...).
          Из-за этого ломается Version.TryParse в CheckForUpdate — обновления
          перестают находиться — и хеш попадает в заголовок окна. -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Authors></Authors>
     <Company>CatLu</Company>
-    <Product>CatLu Radio</Product>
+    <Product>CatLu Radio NET</Product>
     <Description>Internet Radio Player</Description>
     <Copyright>ISC</Copyright>
     <!-- Оптимизации для уменьшения размера -->

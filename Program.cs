@@ -20,7 +20,7 @@ namespace CatLuRadio
                 MessageBox.Show(
                     "Произошла ошибка:\n" + e.Exception.Message +
                     "\n\nПодробности: " + AppLog.CurrentPath,
-                    "CatLu Radio", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    "CatLu Radio NET", MessageBoxButtons.OK, MessageBoxIcon.Error);
             };
             AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             {

@@ -220,7 +220,7 @@ const TranslationManager = {
       'Станция успешно обновлена и сохранена!': 'Station updated and saved successfully!',
       'Вы уверены, что хотите удалить эту станцию?': 'Are you sure you want to delete this station?',
       'Ошибка при удалении станции: {error}': 'Error deleting station: {error}',
-      'CatLu Radio v3.5.0\n\nПриложение для прослушивания интернет-радио.': 'CatLu Radio v3.5.0\n\nInternet radio player.',
+      'CatLu Radio NET v3.5.1\n\nПриложение для прослушивания интернет-радио.': 'CatLu Radio NET v3.5.1\n\nInternet radio player.',
 
       // ——— Проверка станций и обновления ———
       'Проверка…': 'Checking…',

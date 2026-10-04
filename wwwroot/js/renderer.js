@@ -1885,7 +1885,7 @@ function updateNowPlaying(stationName) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: station.name || stationName || t('Радиостанция'),
         artist: station.genre || t('Интернет-радио'),
-        album: 'CatLu Radio',
+        album: 'CatLu Radio NET',
         artwork: station.image ? [
           { src: station.image, sizes: '512x512', type: 'image/png' }
         ] : [
@@ -3277,7 +3277,7 @@ function setupIPCListeners() {
   });
   
   register('onShowAbout', () => {
-    showToast(t('CatLu Radio v3.5.0\n\nПриложение для прослушивания интернет-радио.'), 'info');
+    showToast(t('CatLu Radio NET v3.5.1\n\nПриложение для прослушивания интернет-радио.'), 'info');
   });
   
   // При выгрузке страницы помечаем закрытие: stopPlay() в этом случае не

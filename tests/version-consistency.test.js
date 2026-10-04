@@ -21,7 +21,7 @@ if (stale.length > 0) {
 }
 
 const renderer = fs.readFileSync(path.join(root, 'wwwroot', 'js', 'renderer.js'), 'utf8');
-const about = renderer.match(/CatLu Radio v([0-9]+(?:\.[0-9]+)+)/);
+const about = renderer.match(/CatLu Radio(?: NET)? v([0-9]+(?:\.[0-9]+)+)/);
 if (about && about[1] !== version) {
   throw new Error(`Диалог «О программе» показывает v${about[1]}, а приложение ${version}`);
 }
