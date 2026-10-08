@@ -1030,6 +1030,14 @@ async function playStation(station) {
   await window.AppAPI.stopNative();
   state.nativeAudio = false;
 
+  // Переключение с YouTube на обычную станцию: радио играет тем же LibVLC,
+  // но очередь YouTube и последняя длительность иначе переживают смену
+  // станции — гейт `ytQueue && nativeLength > 0` проходил на устаревших
+  // значениях и панель перемотки оставалась видна поверх радио
+  // (жалоба 2026-10-08: «при проигрывании станции меню ютуба не исчезает»).
+  state.ytQueue = null;
+  resetSeekState();
+
   const crossfadeEnabled = state.settings.crossfade && state.settings.crossfade.enabled;
   const crossfadeDuration = state.settings.crossfade ? state.settings.crossfade.duration : 2000;
   const useCrossfade = crossfadeEnabled && state.audio && state.isPlaying;
@@ -2425,23 +2433,46 @@ async function checkAllStations() {
 }
 
 let availableUpdate = null;
+let checkingUpdate = false;
 async function checkForUpdates() {
   const status = document.getElementById('updateStatus');
   const install = document.getElementById('installUpdateBtn');
-  if (!status || !install) return;
+  const button = document.getElementById('checkUpdateBtn');
+  // Повторный клик во время уже идущей проверки не нужен.
+  if (!status || !install || checkingUpdate) return;
+  checkingUpdate = true;
+  const startedAt = performance.now();
   status.textContent = t('Проверка обновлений…');
   install.style.display = 'none';
-  const result = await window.AppAPI.checkForUpdate();
+  // Кнопка на время запроса явно «занята» (стиль .btn:disabled), иначе
+  // быстрый ответ GitHub делает клик визуально мёртвым.
+  if (button) { button.disabled = true; button.setAttribute('aria-busy', 'true'); }
+  let result = null;
+  try {
+    result = await window.AppAPI.checkForUpdate();
+  } catch (e) {
+    console.error('[Обновления] Ошибка проверки:', e);
+  }
+  // Даже на мгновенном ответе фаза «Проверка…» обязана успеть
+  // перерисоваться: жалоба 2026-10-08 — «кнопку забыли подключить».
+  const elapsed = performance.now() - startedAt;
+  if (elapsed < 450) await new Promise(resolve => setTimeout(resolve, 450 - elapsed));
+  if (button) { button.disabled = false; button.removeAttribute('aria-busy'); }
+  checkingUpdate = false;
+  // Штамп времени: статус меняется при КАЖДОМ клике даже при том же
+  // результате («Установлена последняя версия» до и после больше не выглядит
+  // как отсутствие реакции).
+  const stamp = ` ⏱ ${new Date().toTimeString().slice(0, 8)}`;
   if (!result?.success) {
-    status.textContent = t('Не удалось проверить обновления.');
+    status.textContent = t('Не удалось проверить обновления.') + stamp;
     return;
   }
   if (!result.hasUpdate || !result.url) {
-    status.textContent = t('Установлена последняя версия.');
+    status.textContent = t('Установлена последняя версия.') + stamp;
     return;
   }
   availableUpdate = result;
-  status.textContent = t('Доступна версия {version}.', { version: result.version });
+  status.textContent = t('Доступна версия {version}.', { version: result.version }) + stamp;
   install.textContent = t('Обновить до {version}', { version: result.version });
   install.style.display = 'inline-block';
 }

@@ -1540,6 +1540,12 @@ body {
   transform: none;
 }
 
+/* Проверка обновлений: пока идёт запрос, курсор «занят» — кнопка
+   визуально реагирует на клик даже до смены статуса. */
+#checkUpdateBtn[aria-busy="true"] {
+  cursor: progress;
+}
+
 .btn-mini-primary {
   background: var(--md-primary);
   border-color: transparent;

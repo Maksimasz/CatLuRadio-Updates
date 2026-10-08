@@ -38,6 +38,22 @@ const renderer = read('wwwroot', 'js', 'renderer.js');
 for (const marker of ['handleNativeTime', 'updateSeekUI', 'setupSeekControls', 'resetSeekState', 'formatSeekTime', 'switchTrack']) {
   if (!renderer.includes(marker)) throw new Error(`В renderer.js нет "${marker}"`);
 }
+
+// Обычное радио играет тем же LibVLC: без сброса очереди и длительности в
+// playStation гейт `ytQueue && nativeLength > 0` проходил на устаревших
+// значениях от предыдущего YouTube и панель оставалась видна на радио
+// (жалоба 2026-10-08).
+const playStationBody = renderer.slice(
+  renderer.indexOf('async function playStation('),
+  renderer.indexOf('async function playYoutubeStation(')
+);
+if (playStationBody.length <= 0) throw new Error('Функция playStation не найдена');
+if (!playStationBody.includes('state.ytQueue = null') || !playStationBody.includes('resetSeekState()')) {
+  throw new Error('playStation не сбрасывает очередь YouTube: панель перемотки останется видна на радио');
+}
+if (!renderer.includes('Boolean(state.ytQueue) && state.nativeLength > 0')) {
+  throw new Error('Гейт панели перемотки изменён без теста');
+}
 // Подписка на событие позиции: без неё полоса никогда не обновится.
 if (!renderer.includes("register('onNativeTime', handleNativeTime)")) {
   throw new Error('renderer.js не подписан на onNativeTime');

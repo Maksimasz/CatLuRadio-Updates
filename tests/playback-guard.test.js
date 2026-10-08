@@ -85,6 +85,12 @@ if (source.includes("${found.codec || '?'} ${found.bitrate || '?'} kbps")) throw
 if (!source.includes('checkForUpdates();') || !source.includes('installAvailableUpdate')) throw new Error('Проверка обновлений при запуске не подключена');
 if (!adapter.includes("checkForUpdate: () => sendToNative('checkForUpdate')")) throw new Error('Проверка обновлений не передаётся в приложение');
 if (!index.includes('id="system"') || !index.includes('id="checkUpdateBtn"') || !index.includes('Maksimasz/CatLuRadioNET')) throw new Error('Обновления не размещены в разделе системы');
+// Жалоба 2026-10-08 «кнопку забыли подключить»: на быстром ответе GitHub
+// короткая вспышка «Проверка…» могла не успеть перерисоваться, а конечный
+// текст совпадал с прежним. Кнопка обязана блокироваться, фаза проверки —
+// быть заметной, статус — меняться при каждом клике (штамп времени).
+if (!source.includes('checkingUpdate') || !source.includes("setAttribute('aria-busy'")) throw new Error('Кнопка проверки обновлений не блокируется на время запроса');
+if (!source.includes('⏱')) throw new Error('Статус проверки без штампа времени: повторный клик визуально ничего не меняет');
 
 // alert() блокирует страницу: при серии ошибок воспроизведения складывалась
 // стопка одинаковых системных окон, которые надо закрывать руками. Всё, что
