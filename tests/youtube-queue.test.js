@@ -73,6 +73,13 @@ if (!renderer.includes('Не удалось перезапустить стан�
   throw new Error('togglePlay() не перезапускает станцию, когда плеер встал');
 }
 
+// Раздел «YouTube» в списке станций: добавленные плейлисты не должны
+// висеть в «Другая» — у них свой раздел, первым в списке.
+if (!renderer.includes('const isYoutubeStation = station =>') ||
+    !renderer.includes('groups.push([\'YouTube\', ytStations]')) {
+  throw new Error('В renderStations нет отдельного раздела «YouTube» для yt-станций');
+}
+
 // ——— Один экземпляр на каталог данных ———
 // Две живые копии делили один store_v2.json (вторая затирала станции первой,
 // включая добавленные YouTube-плейлисты) и играли одновременно — отсюда

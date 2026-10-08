@@ -755,13 +755,23 @@ function renderStations(stations) {
       </div>
     </div>
   `).join('');
+  // YouTube-плейлисты и одиночные видео живут в своём разделе «YouTube»,
+  // а не вперемешку с «Другая»: им нечего искать по странам, важен сам
+  // плейлист. Раздел — первым в списке, остальные группы как раньше.
+  const isYoutubeStation = station =>
+    station.type === 'youtube-playlist' || (typeof station.id === 'string' && station.id.startsWith('yt-'));
+  const ytStations = filtered.filter(isYoutubeStation);
   const countries = new Map();
-  filtered.forEach(station => countries.set(station.country, [...(countries.get(station.country) || []), station]));
-  container.innerHTML = [...countries]
+  filtered.filter(s => !isYoutubeStation(s)).forEach(station => countries.set(station.country, [...(countries.get(station.country) || []), station]));
+  const groups = [];
+  if (ytStations.length) groups.push(['YouTube', ytStations]);
+  [...countries]
     .sort(([a], [b]) => getCountryName(a).localeCompare(getCountryName(b), 'ru'))
-    .map(([country, group], index) => `
+    .forEach(([country, group]) => groups.push([getCountryName(country), group]));
+  container.innerHTML = groups
+    .map(([title, group], index) => `
       <details class="country-group" ${index === 0 ? 'open' : ''}>
-        <summary>${escapeHtml(getCountryName(country))}<span>${group.length}</span></summary>
+        <summary>${escapeHtml(title)}<span>${group.length}</span></summary>
         ${cards(group)}
       </details>
     `).join('');

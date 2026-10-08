@@ -73,6 +73,12 @@ namespace CatLuRadio
             httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
             httpClient.DefaultRequestHeaders.Add("User-Agent", "CatLuRadio/" + Application.ProductVersion);
             Core.Initialize(Path.Combine(AppContext.BaseDirectory, "libvlc", "win-x64"));
+            // Фильтры audio-filter на уровне экземпляра LibVLC здесь НЕ работают:
+            // SetEqualizer при каждом старте трека перезаписывает переменную
+            // "audio-filter" на "equalizer", выкидывая из цепочки и gain, и
+            // normvol (проверено: --audio-filter=gain --gain-value=2.0 не менял
+            // громкость). Усиление делаем Preamp'ом внутри Equalizer — см.
+            // SetNativeEqualizer.
             nativeVlc = new LibVLC("--no-video", "--network-caching=1000");
             nativePlayer = new MediaPlayer(nativeVlc);
             nativePlayer.Playing += (_, _) => nativeStart?.TrySetResult(true);
@@ -610,22 +616,31 @@ namespace CatLuRadio
             return null;
         }
 
+        // Общее усиление воспроизведения YouTube в дБ. Ютубовская нормализация
+        // поднимает тихие ролики примерно на +6 дБ: без этого ролик, который на
+        // YouTube на 50% слайдера даёт привычную громкость, требовал бы в
+        // нашем плеере 100%. Preamp эквалайзера — «global gain in dB (-20..20)»
+        // и живёт внутри фильтра equalizer, поэтому SetEqualizer его не выкинет.
+        private const float NativeGainDb = 6f;
+
         private void SetNativeEqualizer(JArray? values, string callbackId) {
             nativeEqualizer?.Dispose();
             nativeEqualizer = null;
-            if (values is null || values.Count == 0) {
-                nativePlayer.UnsetEqualizer();
-                SendCallback(callbackId, new { success = true });
-                return;
-            }
+            // Применяем эквалайзер ВСЕГДА (даже когда он выключен): раньше
+            // ветка UnsetEqualizer гасила и общий gain, из-за чего громкость
+            // прыгала в зависимости от состояния эквалайзера. Пустой эквалайзер
+            // — ровные полосы + Preamp, т.е. звук тот же, громкость та же.
             nativeEqualizer = new Equalizer();
-            for (uint index = 0; index < nativeEqualizer.BandCount && index < values.Count; index++) {
-                // Индексатор JArray принимает только int/string: uint давал
-                // ArgumentException ("Int32 array index expected") до SendCallback —
-                // страница висела 20 секунд на каждый запуск трека, и за это
-                // время у коротких треков успевало сработать nativeEnded,
-                // которое guard isSwitching молча отбрасывал.
-                nativeEqualizer.SetAmp(Math.Clamp(values[(int)index]?.Value<float>() ?? 0, -12, 12), index);
+            nativeEqualizer.SetPreamp(NativeGainDb);
+            if (values is not null) {
+                for (uint index = 0; index < nativeEqualizer.BandCount && index < values.Count; index++) {
+                    // Индексатор JArray принимает только int/string: uint давал
+                    // ArgumentException ("Int32 array index expected") до SendCallback —
+                    // страница висела 20 секунд на каждый запуск трека, и за это
+                    // время у коротких треков успевало сработать nativeEnded,
+                    // которое guard isSwitching молча отбрасывал.
+                    nativeEqualizer.SetAmp(Math.Clamp(values[(int)index]?.Value<float>() ?? 0, -12, 12), index);
+                }
             }
             var success = nativePlayer.SetEqualizer(nativeEqualizer);
             if (!success) { nativeEqualizer.Dispose(); nativeEqualizer = null; }
