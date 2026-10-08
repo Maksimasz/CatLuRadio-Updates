@@ -857,6 +857,81 @@ body {
   line-height: 1.4;
 }
 
+/* Перемотка YouTube: строка под названием трека в «Сейчас играет».
+   Полоса тонкая, но с увеличенной зоной захвата — ей удобно метаться. */
+.seek-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 2px 0;
+}
+
+.seek-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--md-primary);
+  cursor: pointer;
+}
+
+.seek-btn:hover {
+  background: rgba(76, 139, 245, 0.16);
+}
+
+.seek-btn:active {
+  background: rgba(76, 139, 245, 0.3);
+}
+
+.seek-time {
+  flex-shrink: 0;
+  min-width: 32px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="dark"] .seek-time {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.seek-track {
+  position: relative;
+  flex: 1;
+  min-width: 40px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  touch-action: none; /* pointer-захват при перетаскивании */
+}
+
+.seek-track:hover {
+  height: 9px;
+}
+
+[data-theme="dark"] .seek-track {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.seek-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  border-radius: 4px;
+  background: var(--md-primary);
+  pointer-events: none;
+}
+
 
 /* Windows 11 Scrollbar */
 ::-webkit-scrollbar {

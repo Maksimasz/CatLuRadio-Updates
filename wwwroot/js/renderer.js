@@ -12,6 +12,12 @@ let state = {
   isPlaying: false,
   volume: 0.5, // Громкость по умолчанию 50%
   nativeAudio: false,
+  // Перемотка YouTube: позиция и длительность текущего трека в миллисекундах
+  // (событие nativeTime хоста). length <= 0 — живой поток, полоса скрыта.
+  nativeTime: 0,
+  nativeLength: 0,
+  // Пользователь тянет полосу: события позиции не должны заслонять превью.
+  seekDragging: false,
   isClosing: false,
   isStopping: false, // Флаг для отслеживания программной остановки
   isSwitching: false, // Флаг для предотвращения множественных переключений
@@ -437,6 +443,32 @@ async function saveData() {
     logError('Error saving data:', error);
     throw error;
   }
+}
+
+// Отложенное сохранение громкости. Слайдер шлёт десятки input-событий в
+// секунду, а каждое saveData() — это IPC + полный JSON стора (станции,
+// история) на диск: UI-поток подвисал, очередь сообщений росла, и
+// setNativeVolume доезжал с опозданием — громкость «плавала» позади
+// ползунка. Теперь — один сохранённый настройки через 400 мс тишины,
+// а по отпусканию ползунка (change) — немедленно.
+let volumeSaveTimer = null;
+function saveVolumeSettings() {
+  window.AppAPI.saveSettings({ ...state.settings, volume: state.volume })
+    .catch((error) => logError('Не удалось сохранить громкость:', error));
+}
+function scheduleVolumeSave() {
+  if (volumeSaveTimer) clearTimeout(volumeSaveTimer);
+  volumeSaveTimer = setTimeout(() => {
+    volumeSaveTimer = null;
+    saveVolumeSettings();
+  }, 400);
+}
+function flushVolumeSave() {
+  if (volumeSaveTimer) {
+    clearTimeout(volumeSaveTimer);
+    volumeSaveTimer = null;
+  }
+  saveVolumeSettings();
 }
 
 // Автозапуск при старте упирается в политику autoplay Chromium: без жеста
@@ -1154,6 +1186,9 @@ async function playYoutubeTrack(requestedIndex) {
   queue.index = ((requestedIndex % count) + count) % count;
   const track = queue.tracks[queue.index];
   let started = false;
+  // Новый трек: полоса гаснет до первого nativeTime от хоста — старая
+  // позиция не должна пережить переключение.
+  resetSeekState();
 
   try {
     const resolved = await window.AppAPI.resolveYoutubeTrack(track.id);
@@ -1264,9 +1299,118 @@ function handleNativeError() {
   console.warn('LibVLC: поток прервался, останавливаем воспроизведение');
   state.isPlaying = false;
   state.nativeAudio = false;
+  resetSeekState();
   updatePlayButton();
   updateNowPlaying('—');
   showToast(t('Воспроизведение прервано: поток недоступен'), 'error');
+}
+
+// ——— Перемотка YouTube ———
+// Полоса под названием трека в «Сейчас играет»: рисуется только пока играет
+// очередь YouTube и хост сообщает длительность (Length > 0 у живого радио нет).
+
+function resetSeekState() {
+  state.nativeTime = 0;
+  state.nativeLength = 0;
+  state.seekDragging = false;
+  updateSeekUI();
+}
+
+function formatSeekTime(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = String(total % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+// Событие nativeTime: позиция/длительность от хоста (раз в 250 мс).
+function handleNativeTime(event) {
+  const detail = (event && event.detail) || {};
+  const time = Number(detail.time);
+  const length = Number(detail.length);
+  state.nativeTime = Number.isFinite(time) ? Math.max(0, time) : 0;
+  state.nativeLength = Number.isFinite(length) ? Math.max(0, length) : 0;
+  updateSeekUI();
+}
+
+function updateSeekUI() {
+  const controls = document.getElementById('seekControls');
+  if (!controls) return;
+  // Гейт двойной: без очереди YouTube полоса не нужна, без длительности
+  // (живой поток, медиа снято) перемотывать нечего.
+  const visible = Boolean(state.ytQueue) && state.nativeLength > 0;
+  controls.style.display = visible ? '' : 'none';
+  if (!visible) return;
+
+  const totalEl = document.getElementById('seekTimeTotal');
+  const currentEl = document.getElementById('seekTimeCurrent');
+  const fill = document.getElementById('seekFill');
+  if (totalEl) totalEl.textContent = formatSeekTime(state.nativeLength);
+  // Пока ползунок в руках — превью позиции держит pointermove, не события.
+  if (state.seekDragging) return;
+  const pos = Math.min(state.nativeTime, state.nativeLength);
+  if (fill) fill.style.width = (pos / state.nativeLength * 100) + '%';
+  if (currentEl) currentEl.textContent = formatSeekTime(pos);
+}
+
+// Кнопки ±10 секунд и клик/перетаскивание по полосе.
+function setupSeekControls() {
+  const track = document.getElementById('seekTrack');
+  const backBtn = document.getElementById('seekBackBtn');
+  const fwdBtn = document.getElementById('seekFwdBtn');
+  if (!track) return;
+
+  const fractionFrom = (e) => {
+    const rect = track.getBoundingClientRect();
+    if (rect.width <= 0) return 0;
+    return Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  };
+
+  const preview = (e) => {
+    if (!(state.nativeLength > 0)) return undefined;
+    const pos = fractionFrom(e) * state.nativeLength;
+    const fill = document.getElementById('seekFill');
+    const currentEl = document.getElementById('seekTimeCurrent');
+    if (fill) fill.style.width = (pos / state.nativeLength * 100) + '%';
+    if (currentEl) currentEl.textContent = formatSeekTime(pos);
+    return pos;
+  };
+
+  track.addEventListener('pointerdown', (e) => {
+    if (!state.ytQueue || !(state.nativeLength > 0)) return;
+    state.seekDragging = true;
+    try { track.setPointerCapture(e.pointerId); } catch (_) { /* capture — по желанию */ }
+    preview(e);
+    e.preventDefault();
+  });
+  track.addEventListener('pointermove', (e) => {
+    if (state.seekDragging) preview(e);
+  });
+  const commit = (e) => {
+    if (!state.seekDragging) return;
+    const pos = preview(e);
+    state.seekDragging = false;
+    if (pos !== undefined) {
+      state.nativeTime = pos;
+      window.AppAPI.seekNative(Math.round(pos));
+    }
+    updateSeekUI();
+  };
+  track.addEventListener('pointerup', commit);
+  track.addEventListener('pointercancel', () => {
+    state.seekDragging = false;
+    updateSeekUI();
+  });
+
+  const nudge = (deltaSec) => {
+    if (!state.ytQueue || !(state.nativeLength > 0)) return;
+    const target = Math.min(Math.max(state.nativeTime + deltaSec * 1000, 0), state.nativeLength);
+    state.nativeTime = target;
+    window.AppAPI.seekNative(Math.round(target));
+    updateSeekUI();
+  };
+  if (backBtn) backBtn.addEventListener('click', () => nudge(-10));
+  if (fwdBtn) fwdBtn.addEventListener('click', () => nudge(10));
 }
 
 
@@ -1958,6 +2102,7 @@ function stopPlay() {
   state.isSwitching = false;
   // Очередь YouTube живёт ровно до остановки: nativeEnded её больше не тронет
   state.ytQueue = null;
+  resetSeekState();
 
   window.AppAPI.stopNative();
   state.nativeAudio = false;
@@ -2513,8 +2658,15 @@ function setupEventListeners() {
     applyPlaybackVolume(volume);
     if (state.nativeAudio) window.AppAPI.setNativeVolume(volume);
     
-    saveData();
+    // Не saveData() на каждый input: полный JSON стора на каждое событие
+    // слайдера и есть причина «плавающей» громкости (см. scheduleVolumeSave).
+    scheduleVolumeSave();
   });
+  // Отпустили ползунок — сохранить сразу, не дожидаясь дебаунса.
+  volumeSlider.addEventListener('change', flushVolumeSave);
+
+  // Перемотка YouTube: полоса и кнопки под названием трека в «Сейчас играет».
+  setupSeekControls();
   
   // Мини-плеер: кнопки управления
   const miniPlayPauseBtn = document.getElementById('miniPlayPauseBtn');
@@ -2551,8 +2703,10 @@ function setupEventListeners() {
       applyPlaybackVolume(volume);
       if (state.nativeAudio) window.AppAPI.setNativeVolume(volume);
       
-      saveData();
+      scheduleVolumeSave();
     });
+    // Отпустили ползунок — сохранить сразу, не дожидаясь дебаунса.
+    miniVolumeSlider.addEventListener('change', flushVolumeSave);
   }
   
   // Поиск
@@ -3546,6 +3700,8 @@ function setupIPCListeners() {
   // посреди игры, очередь пропускает трек по общим правилам.
   register('onNativeEnded', handleNativeEnded);
   register('onNativeError', handleNativeError);
+  // Перемотка YouTube: позиция и длительность трека для полосы прогресса.
+  register('onNativeTime', handleNativeTime);
   
   register('onStopAllAudio', () => {
     stopAllAudio();

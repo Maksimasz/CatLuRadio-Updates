@@ -46,6 +46,11 @@ namespace CatLuRadio
         private Media? nativeMedia;
         private Equalizer? nativeEqualizer;
         private TaskCompletionSource<bool>? nativeStart;
+        // Дроссель событий позиции (nativeTime): TimeChanged сыплет десятки
+        // событий в секунду — на UI-поток уходит не чаще раза в 250 мс.
+        private long nativeTimeTick;
+        private long lastSentTime = long.MinValue;
+        private long lastSentLength = long.MinValue;
         // Резолвер YouTube (NuGet YoutubeExplode): списки плейлистов и прямые
         // аудио-потоки для очереди YouTube-плейлистов.
         private readonly YoutubeClient ytClient = new();
@@ -86,6 +91,8 @@ namespace CatLuRadio
             // Конец текущего файла (не потока): страница решает, что делать —
             // для YouTube-очереди это сигнал перейти к следующему треку.
             nativePlayer.EndReached += (_, _) => OnNativeEnded();
+            // Позиция внутри трека: страница рисует полосу перемотки YouTube.
+            nativePlayer.TimeChanged += (_, _) => OnNativeTimeTick();
             LoadStore();
             InitializeComponent();
         }
@@ -324,6 +331,10 @@ namespace CatLuRadio
                         StopNative();
                         SendCallback(callbackId, new { success = true });
                         break;
+                    case "seekNative":
+                        SeekNative(data["ms"]?.Value<long>() ?? 0);
+                        SendCallback(callbackId, new { success = true });
+                        break;
                     case "setNativeVolume":
                         nativePlayer.Volume = (int)Math.Round(Math.Clamp(data["volume"]?.Value<double>() ?? 0.5, 0, 1) * 100);
                         SendCallback(callbackId, new { success = true });
@@ -498,6 +509,59 @@ namespace CatLuRadio
                 AppLog.Info("nativeEnded: событие отправлено в страницу");
             } catch (Exception ex) {
                 AppLog.Error("nativeEnded: не удалось отправить событие", ex);
+            }
+        }
+
+        // Позиция внутри трека для полосы перемотки YouTube. TimeChanged
+        // приходит с фонового потока libvlc и очень часто: дросселируем на
+        // этом же потоке (не чаще, чем раз в 250 мс), дальше — BeginInvoke
+        // на UI-поток. Как и nativeEnded: никаких вызовов плеера из потока
+        // libvlc, чтение Time/Length только на UI-потоке.
+        private void OnNativeTimeTick() {
+            long now = Environment.TickCount64;
+            if (now - Volatile.Read(ref nativeTimeTick) < 250) return;
+            Volatile.Write(ref nativeTimeTick, now);
+            try {
+                if (!IsHandleCreated) return;
+                if (InvokeRequired) { BeginInvoke(SendNativeTime); return; }
+                SendNativeTime();
+            } catch (Exception ex) {
+                AppLog.Error("nativeTime: BeginInvoke не прошёл", ex);
+            }
+        }
+
+        private void SendNativeTime() {
+            try {
+                if (!IsHandleCreated || webView?.CoreWebView2 is null) return;
+                long time = nativePlayer.Time;    // мс; -1 когда медиа уже снято
+                long length = nativePlayer.Length;
+                // Дежавю не шлём: без этого страница получала бы по 4 события
+                // в секунду даже на паузе.
+                if (time == lastSentTime && length == lastSentLength) return;
+                lastSentTime = time;
+                lastSentLength = length;
+                webView.CoreWebView2.PostWebMessageAsString(
+                    JsonConvert.SerializeObject(new { @event = "nativeTime", time, length }));
+            } catch (Exception ex) {
+                AppLog.Error("nativeTime: не удалось отправить событие", ex);
+            }
+        }
+
+        // Перемотка по запросу страницы (ms — новая позиция в миллисекундах).
+        // Живые потоки (радио) длительности не имеют — Length <= 0, перемотка
+        // для них бессмысленна и молча игнорируется.
+        private void SeekNative(long ms) {
+            try {
+                long length = nativePlayer.Length;
+                if (length <= 0) return;
+                long target = Math.Clamp(ms, 0, length);
+                nativePlayer.Time = target;
+                // Не ждём следующего TimeChanged (дроссель до 250 мс):
+                // сразу подтверждаем позицию, полоса прыгает мгновенно.
+                lastSentTime = -1;
+                SendNativeTime();
+            } catch (Exception ex) {
+                AppLog.Error("seekNative: перемотка не удалась", ex);
             }
         }
 

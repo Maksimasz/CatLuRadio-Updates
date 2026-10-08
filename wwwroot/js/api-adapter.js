@@ -139,6 +139,8 @@ const WebView2API = {
     pauseNative: () => sendToNative('pauseNative'),
     resumeNative: () => sendToNative('resumeNative'),
     stopNative: () => sendToNative('stopNative'),
+    // Перемотка YouTube: новая позиция в миллисекундах.
+    seekNative: (ms) => sendToNative('seekNative', { ms }),
     setNativeVolume: (volume) => sendToNative('setNativeVolume', { volume }),
     setNativeEqualizer: (values) => sendToNative('setNativeEqualizer', { values }),
     // YouTube: список треков плейлиста при добавлении + аудио-поток трека
@@ -251,6 +253,7 @@ window.AppAPI = {
     pauseNative: () => WebView2API.pauseNative(),
     resumeNative: () => WebView2API.resumeNative(),
     stopNative: () => WebView2API.stopNative(),
+    seekNative: (ms) => WebView2API.seekNative(ms),
     setNativeVolume: (volume) => WebView2API.setNativeVolume(volume),
     setNativeEqualizer: (values) => WebView2API.setNativeEqualizer(values),
     resolveYoutubePlaylist: (url) => WebView2API.resolveYoutubePlaylist(url),
@@ -259,6 +262,8 @@ window.AppAPI = {
     // nativeError — поток умер посреди игры (обрыв сети, 403 от googlevideo).
     onNativeEnded: (handler) => WebView2API.onHostEvent('nativeEnded', handler),
     onNativeError: (handler) => WebView2API.onHostEvent('nativeError', handler),
+    // nativeTime — позиция/длительность трека для полосы перемотки YouTube.
+    onNativeTime: (handler) => WebView2API.onHostEvent('nativeTime', handler),
     searchOnlineStations: async (name = '', country = '', portal = 'all') => {
         const include = source => portal === 'all' || portal === source;
         let radioBrowser = [];
