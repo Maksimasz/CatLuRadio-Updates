@@ -519,6 +519,8 @@
   <!-- Контейнер всплывающих уведомлений: см. showToast() в renderer.js -->
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
 
+  <!-- Чистка списка станций при старте: отдельный модуль, чтобы тесты могли его проверять -->
+  <script src="js/station-cleanup.js?v=3.5.1"></script>
   <!-- Основной скрипт -->
   <script src="js/renderer.js?v=3.5.1"></script>
   <!-- Вкладки внутри настроек: панели вместо аккордеонов -->

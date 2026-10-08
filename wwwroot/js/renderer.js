@@ -310,6 +310,9 @@ async function loadData() {
     }
     
     const defaultIds = new Set(defaultStationsList.map(s => s.id));
+    // Избранное хранит только id: чистка при старте обязана щадить такие станции,
+    // иначе ссылка остаётся в никуда, а избранное выглядит пустым.
+    const favoriteIds = new Set(Array.isArray(state.favorites) ? state.favorites : []);
     
     // ВСЕГДА использовать только станции из stations.js (из CatLu-radio-stations.json)
     // Это проверенные рабочие станции - других предустановленных быть не должно
@@ -331,9 +334,11 @@ async function loadData() {
     }
     // Если версия изменилась или не установлена - ПРИНУДИТЕЛЬНО заменить все предустановленные
     else if (!savedVersion || savedVersion !== currentVersion) {
-      // Сохранить ВСЕ пользовательские станции (те, что начинаются с 'user-' или 'imported_' и не входят в предустановленные)
-      const userStations = state.stations.filter(s => 
-        s.id && (s.id.startsWith('user-') || s.id.startsWith('imported_')) && !defaultIds.has(s.id)
+      // Сохранить ВСЕ пользовательские: добавленные вручную и из онлайн-поиска (user-),
+      // импортированные (imported_), YouTube-плейлисты (yt-) и избранные —
+      // единый критерий для всех веток чистки, см. StationCleanup.isUserAdded
+      const userStations = state.stations.filter(s =>
+        s.id && StationCleanup.isUserAdded(s, favoriteIds) && !defaultIds.has(s.id)
       );
       
       console.log('Сохранение пользовательских станций при обновлении версии:', userStations.length);
@@ -350,43 +355,22 @@ async function loadData() {
     }
     // Если версия совпадает, проверить на дубликаты и старые предустановленные станции
     else {
-      // Проверить на дубликаты по ID и по URL
-      const seenIds = new Set();
-      const seenUrls = new Set();
-      const uniqueStations = [];
-      const duplicates = [];
-      
-      for (const station of state.stations) {
-        // Проверка по ID
-        if (station.id && seenIds.has(station.id)) {
-          duplicates.push(station);
-          continue;
-        }
-        
-        // Проверка по URL (нормализованному)
-        const normalizedUrl = station.url?.toLowerCase().trim();
-        if (normalizedUrl && seenUrls.has(normalizedUrl)) {
-          duplicates.push(station);
-          continue;
-        }
-        
-        // Станция уникальна
-        if (station.id) seenIds.add(station.id);
-        if (normalizedUrl) seenUrls.add(normalizedUrl);
-        uniqueStations.push(station);
-      }
-      
-      // Если есть дубликаты, удалить их
-      if (duplicates.length > 0) {
-        console.log(`Удалено дубликатов: ${duplicates.length}`);
+      // Дубликаты по ID и по URL: при конфликте выигрывает пользовательская
+      // станция (StationCleanup), а не предустановленная. Раньше побеждал
+      // первый встреченный: копия пользователя выбрасывалась, а предустановленное
+      // с тем же URL потом уходило в «старые» — терялись обе.
+      const { stations: uniqueStations, dropped } = StationCleanup.dedupe(state.stations, favoriteIds);
+
+      if (dropped > 0) {
+        console.log(`Удалено дубликатов: ${dropped}`);
         state.stations = uniqueStations;
         await window.AppAPI.saveStations(state.stations);
       }
       
       // Проверить, есть ли старые предустановленные станции, которых нет в новом списке
-      // Исключаем пользовательские (user-) и импортированные (imported_) станции
-      const oldDefaultStations = state.stations.filter(s => 
-        s.id && !s.id.startsWith('user-') && !s.id.startsWith('imported_') && !defaultIds.has(s.id)
+      // Пользовательские (user-/imported_/yt-) и избранные не трогаем — StationCleanup
+      const oldDefaultStations = state.stations.filter(s =>
+        s.id && !StationCleanup.isUserAdded(s, favoriteIds) && !defaultIds.has(s.id)
       );
       
       // Проверить, все ли предустановленные станции присутствуют
@@ -394,9 +378,10 @@ async function loadData() {
       const missingDefaults = defaultStationsList.filter(s => !existingDefaultIds.has(s.id));
       
       if (oldDefaultStations.length > 0 || missingDefaults.length > 0) {
-        // Оставить только проверенные предустановленные и пользовательские (включая импортированные)
-        const userStations = state.stations.filter(s => 
-          s.id && (s.id.startsWith('user-') || s.id.startsWith('imported_')) && !defaultIds.has(s.id)
+        // Оставить только проверенные предустановленные и пользовательские
+        // (в том числе YouTube-плейлисты yt-) — критерий см. StationCleanup
+        const userStations = state.stations.filter(s =>
+          s.id && StationCleanup.isUserAdded(s, favoriteIds) && !defaultIds.has(s.id)
         );
         
         console.log('Сохранение пользовательских станций при очистке старых предустановленных:', userStations.length);
@@ -409,6 +394,26 @@ async function loadData() {
         await window.AppAPI.saveStations(state.stations);
         await window.AppAPI.saveStationsVersion(currentVersion);
       }
+    }
+
+    // Восстановление из избранного: оно хранит только id. Если станция
+    // пропала из списка (старые версии выкидывали её при чистке), достаём
+    // полный объект из истории — иначе избранное навсегда останется пустым.
+    const knownIds = new Set(state.stations.map(s => s.id));
+    const restoredFromHistory = [];
+    for (const id of (Array.isArray(state.favorites) ? state.favorites : [])) {
+      if (knownIds.has(id)) continue;
+      const fromHistory = (Array.isArray(state.history) ? state.history : [])
+        .find(h => h && h.id === id);
+      if (fromHistory) {
+        state.stations.push({ ...fromHistory });
+        knownIds.add(id);
+        restoredFromHistory.push(id);
+      }
+    }
+    if (restoredFromHistory.length) {
+      console.log('Восстановлено из истории по избранному:', restoredFromHistory.length);
+      await window.AppAPI.saveStations(state.stations);
     }
   } catch (error) {
     logError('Error loading data:', error);
@@ -655,23 +660,19 @@ function initUI() {
   }
 }
 
-// Загрузка станций
+// Загрузка станций — только отрисовка, без записи в хранилище
 function loadStations() {
-  // Проверить что станции загружены
+  // Раньше при пустом списке здесь подставлялись предустановленные станции
+  // и тут же сохранялись — а вызваться функция успевала ДО loadData():
+  // TranslationManager зовёт refreshLanguageUI() на DOMContentLoaded,
+  // а старт приложения (startApp → init) отложен на 200 мс. Хранилище
+  // затиралось предустановленными при каждом запуске, и всё добавленное
+  // после поставки (станции онлайн-поиска, YouTube-плейлисты) пропадало,
+  // а избранное и история, лежащие в других ключах, оставались на месте.
   if (!state.stations || state.stations.length === 0) {
     logError('ВНИМАНИЕ: Нет станций для отображения! Количество станций: ' + (state.stations ? state.stations.length : 'undefined'));
-    // Попробовать загрузить предустановленные станции
-    if (window.getDefaultStations) {
-      const defaultStations = window.getDefaultStations();
-      if (defaultStations && defaultStations.length > 0) {
-        state.stations = defaultStations;
-        window.AppAPI.saveStations(state.stations).catch(err => {
-          logError('Ошибка сохранения предустановленных станций:', err);
-        });
-      }
-    }
   }
-  
+
   renderStations(state.stations || []);
   renderFavorites();
 }
@@ -2149,9 +2150,10 @@ function isFavorite(stationId) {
 // Проверка, является ли станция пользовательской (можно редактировать)
 function isUserStation(stationId) {
   // Показывать кнопки редактирования/удаления только если включен режим редактирования
-  // Пользовательские станции - это те, что начинаются с 'user-' или 'imported_'
+  // Пользовательские: добавленные вручную и из онлайн-поиска (user-),
+  // импортированные (imported_) и YouTube-плейлисты (yt-)
   if (!state.settings.editMode) return false;
-  return stationId && (stationId.startsWith('user-') || stationId.startsWith('imported_'));
+  return stationId && (stationId.startsWith('user-') || stationId.startsWith('imported_') || stationId.startsWith('yt-'));
 }
 
 // Используем модуль названий стран

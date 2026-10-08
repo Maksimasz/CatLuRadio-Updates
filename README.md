@@ -101,7 +101,7 @@ iscc installer\CatLuRadio.iss   # результат — release/CatLuRadio-*-St
 
 ## 🧪 Тесты
 
-Шесть наборов на Node.js — запускаются по одному:
+Семь наборов на Node.js — запускаются по одному:
 
 ```powershell
 node tests\line-endings.test.js            # LF в файлах, от которых зависят grep-проверки
@@ -110,6 +110,7 @@ node tests\playback-guard.test.js          # защита логики восп�
 node tests\equalizer-normalization.test.js # эквалайзер и нормализация громкости
 node tests\api-adapter-timeout.test.js     # таймауты моста WebView2
 node tests\youtube-queue.test.js           # YouTube-плейлисты: резолвер, nativeEnded, очередь
+node tests\stations-persistence.test.js   # сохранённые станции переживают перезапуск
 ```
 
 ## 🗂 Структура проекта
@@ -123,9 +124,10 @@ CatLuRadio/
 │   ├── styles.css             # палитра Windows 11, светлая/тёмная темы
 │   ├── js/renderer.js         # логика плеера, вкладок, избранного, истории
 │   ├── js/api-adapter.js      # мост WebView2 (в браузере — безопасный фолбэк)
+│   ├── js/station-cleanup.js  # чистка станций при старте (подключается до renderer)
 │   └── modules/               # TranslationManager · ThemeManager · Equalizer …
 ├── installer/CatLuRadio.iss   # скрипт Inno Setup
-├── tests/                     # 6 наборов node-тестов
+├── tests/                     # 7 наборов node-тестов
 ├── docs/screenshots/          # скриншоты для этого README
 └── _history/                  # дневник развития проекта
 ```

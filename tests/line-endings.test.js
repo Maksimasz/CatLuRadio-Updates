@@ -14,9 +14,11 @@ const root = path.join(__dirname, '..');
 const files = [
     path.join('wwwroot', 'js', 'renderer.js'),
     path.join('wwwroot', 'js', 'api-adapter.js'),
+    path.join('wwwroot', 'js', 'station-cleanup.js'),
     path.join('wwwroot', 'index.html'),
     path.join('tests', 'playback-guard.test.js'),
-    path.join('tests', 'api-adapter-timeout.test.js')
+    path.join('tests', 'api-adapter-timeout.test.js'),
+    path.join('tests', 'stations-persistence.test.js')
 ];
 
 const bad = [];
