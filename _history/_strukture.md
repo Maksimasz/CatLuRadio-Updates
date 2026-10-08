@@ -265,3 +265,27 @@
   - Фикс: `SetNativeEqualizer` всегда создаёт Equalizer с **`SetPreamp(+6 дБ)`** (Preamp = «global gain in dB (−20..20)», живёт внутри фильтра equalizer и перезапись audio-filter его не трогает; в LibVLCSharp свойство `Preamp` read-only — используется метод `SetPreamp`). Ветка `UnsetEqualizer` убрана: при выключенном эквалайзере ставится «пустой» (ровные полосы + тот же gain), чтобы громкость не прыгала от состояния EQ. Аргументы `--audio-filter=...` убраны как бесполезные.
   - Проверено объективным измерителем (WASAPI loopback, NAudio-харнесс во временном каталоге): до — RMS −25…−30 дБFS, после — RMS −12,5 дБFS, пик 0,0, клиппинг 0,003% (единичные отсчёты, на слух чисто). Слухом: плеер на 50% ≡ YouTube на 50% — пользователь подтвердил совпадение.
   - 7/7 node-тестов, `dotnet build` (Debug) — 0 ошибок.
+
+## Версия 3.5.2 2026-10-08
+
+### Fix сохранения станций
+
+- **Хранилище больше не затирается при перезапуске**: `loadStations()` вызывался на DOMContentLoaded (его звала `refreshLanguageUI()` из TranslationManager раньше, чем `startApp → init` успевал вызвать `loadData()`) и записывал в store предустановленный список — всё, что пользователь добавил после установки, пропадало. Теперь `loadStations()` только рисует.
+- **Стартовая чистка не выкидывает пользовательские станции**: раньше всё, чего нет в `stations.js` (включая YouTube-плейлисты `yt-`), удалялось, а при дубликате по URL предустановленная станция побеждала пользовательскую. Логика в `wwwroot/js/station-cleanup.js` (`isUserAdded`, `dedupe`): user-/imported_/yt- и избранные не трогаются, при конфликте побеждает пользовательская.
+- **Пропавшее избранное восстанавливается из истории**: избранное хранит только id, полный объект станции остаётся в истории.
+- `isUserStation()` знает про `yt-` — YouTube-плейлисты редактируются и удаляются как пользовательские.
+
+### Что нового
+
+- ▶️ **YouTube-очередь вылечена** («одна песня и стоп»): трёхслойный фикс — фасад AppAPI (`setNativeEqualizer`/`onNativeError`), индексация JArray (`int` вместо `uint`), события `nativeEnded`/`nativeError` с UI-потока WebView2. Очередь зациклена, недоступные треки пропускаются, `togglePlay` перезапускает умершую станцию.
+- 🔒 **Защита от двух экземпляров**: single-instance mutex в `Program.Main` (имя от каталога данных), второй запуск активирует открытое окно — «плавающая громкость» из-за двух одновременных плееров ушла.
+- 📺 **Раздел «YouTube» в списке станций**: добавленные плейлисты и видео идут отдельной группой первой в списке, а не в «Другой».
+- 🔊 **Громкость уровня YouTube**: `SetNativeEqualizer` всегда ставит `SetPreamp(+6 дБ)` — наш 50% слайдера звучит как YouTube на 50% (причина тишины: `SetEqualizer` перезаписывает `audio-filter`, а `normvol` умеет только понижать; проверено loopback-замером RMS −25…−30 → −12,5 дБFS).
+- 🛡 `getStore` отдаёт скаляры через `JsonConvert.SerializeObject` — `JSON.parse` больше не падает на каждом старте.
+
+### Сборка и публикация
+
+- Версия поднята до 3.5.2 везде: csproj (`Version`/`AssemblyVersion`/`FileVersion`), `?v=` в index.html (3 ссылки), installer/CatLuRadio.iss, «О программе» (TranslationManager.js, renderer.js), бейдж README; тест `version-consistency` — OK (3.5.2, ссылок `?v=`: 3).
+- Проверено: 7/7 node-тестов, `dotnet build` (Debug) — 0 ошибок, `dotnet publish -c Release -r win-x64 --self-contained true`.
+- Готовый установщик: `release/CatLuRadio-3.5.2-Standalone-Setup-desktop.exe` (358 288 869 байт, SHA-256 `FA70B58B3D8BEF4583FEC41D2AC035F68834FD7287B2814D7A461820FE0634C1`).
+- Опубликован релиз `v3.5.2`: `https://github.com/Maksimasz/CatLuRadioNET/releases/tag/v3.5.2`; установщик `CatLuRadio-3.5.2-Standalone-Setup-desktop.exe` загружен ассетом (апдейтер приложения смотрит на `releases/latest` этого репозитория).

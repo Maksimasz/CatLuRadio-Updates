@@ -1,5 +1,5 @@
 ﻿#define MyAppName "CatLu Radio NET"
-#define MyAppVersion "3.5.1"
+#define MyAppVersion "3.5.2"
 #define MyAppPublisher "CatLu"
 #define MyAppExeName "CatLuRadio.exe"
 
@@ -8,7 +8,7 @@ AppId={{B15C3E4E-444D-4D92-89C0-153DF1E3AD6B}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-VersionInfoVersion=3.5.1.0
+VersionInfoVersion=3.5.2.0
 VersionInfoProductVersion={#MyAppVersion}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}

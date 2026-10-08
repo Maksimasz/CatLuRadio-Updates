@@ -10,7 +10,7 @@
 
 <br>
 
-<img src="https://img.shields.io/badge/version-3.5.1-4C8BF5?style=flat-square" alt="version">
+<img src="https://img.shields.io/badge/version-3.5.2-4C8BF5?style=flat-square" alt="version">
 <img src="https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-0078D4?style=flat-square" alt="windows">
 <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET">
 <img src="https://img.shields.io/badge/i18n-EN%20%C2%B7%20RU%20%C2%B7%20LT%20%C2%B7%20HE-brightgreen?style=flat-square" alt="i18n">
@@ -147,7 +147,8 @@ CatLuRadio/
 
 ## 📝 Версии
 
-- **3.5.1** — «CatLu Radio NET»: редизайн под Windows 11, мультиязычность EN/RU/LT/HE с автоопределением и RTL, саб-табы в настройках, этот README со скриншотами; позже — исправлено воспроизведение YouTube-очереди (nativeEnded, эквалайзер) и добавлена защита от двух одновременных экземпляров.
+- **3.5.2** — **fix сохранения станций**: при перезапуске `loadStations()` затирал хранилище предустановленным списком (всё добавленное после установки пропадало), стартовая чистка выкидывала YouTube-плейлисты, при дубликате по URL предустановленная станция побеждала пользовательскую, пропавшее избранное восстанавливается из истории. Новое: раздел **«YouTube»** первым в списке станций; **громкость выровнена с YouTube** (+6 дБ Preamp в LibVLC — наш 50% слайдера как YouTube на 50%); вылечена очередь YouTube («одна песня и стоп»: nativeEnded, эквалайзер, мост AppAPI); защита от двух одновременных экземпляров.
+- **3.5.1** — «CatLu Radio NET»: редизайн под Windows 11, мультиязычность EN/RU/LT/HE с автоопределением и RTL, саб-табы в настройках, этот README со скриншотами.
 - **3.5.0** — 10-полосный эквалайзер с Web Audio, доработки воспроизведения, решение проблем с автозапуском.
 
 ---
