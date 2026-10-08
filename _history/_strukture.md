@@ -329,8 +329,23 @@
 - Готовый установщик: `release/CatLuRadio-3.5.3-Standalone-Setup-desktop.exe` (358 318 239 байт, SHA-256 `4F4ECF8D668AF9E760782C4DD80EE6DC802BD3006FA7C78D2CFF9385AAC4572E`).
 - Опубликован релиз `v3.5.3`: `https://github.com/Maksimasz/CatLuRadioNET/releases/tag/v3.5.3`; установщик `CatLuRadio-3.5.3-Standalone-Setup-desktop.exe` загружен ассетом (апдейтер смотрит на `releases/latest`).
 
-## Проверка обновлений и панель на радио 2026-10-08 (в работе)
+## Проверка обновлений и панель на радио 2026-10-08 (выпущено в 3.5.4)
 
 - **Кнопка «Проверить обновления» выглядит живой** (жалоба: «забыли подключить»): раньше клик давал лишь короткую вспышку «Проверка обновлений…», а конечный текст совпадал с прежним («Установлена последняя версия.») — на быстром ответе GitHub фаза проверки могла даже не успеть перерисоваться. Теперь: кнопка блокируется на время запроса (`disabled` + `aria-busy`, гаснет по `.btn:disabled`, курсор `progress`), минимальная видимая фаза проверки 450 мс, в статус добавлен штамп `⏱ ЧЧ:ММ:СС` — текст меняется при каждом клике гарантированно; повторные клики во время проверки игнорируются (`checkingUpdate`).
 - **Панель перемотки не исчезала при обычном радио** (скриншот: играет «100 HITU - Relax FM», а панель видна): обычное радио тоже играет через LibVLC, но `playStation` не сбрасывал `state.ytQueue` и `nativeLength` от предыдущего YouTube — гейт `ytQueue && nativeLength > 0` проходил на устаревших значениях. Теперь при старте не-YouTube станции сбрасываются очередь и длительность (`state.ytQueue = null` + `resetSeekState()`), панель гаснет сразу.
 - Якоря: `tests/playback-guard.test.js` (блокировка кнопки + штамп), `tests/youtube-seek.test.js` (сброс в `playStation` + гейт).
+
+## Версия 3.5.4 2026-10-08
+
+### Что нового
+
+- 🔧 **Фикс «мёртвой» кнопки «Проверить обновления»** (жалоба: «забыли подключить»): кнопка блокируется на время запроса (`disabled` + `aria-busy`, гаснет по `.btn:disabled`, курсор `progress`), минимальная видимая фаза проверки 450 мс, статус получает штамп `⏱ ЧЧ:ММ:СС` — текст меняется при каждом клике гарантированно; повторные клики игнорируются (`checkingUpdate`).
+- 📻 **Панель перемотки скрывается на обычном радио** (жалоба: «при проигрывании станции меню ютуба не исчезает»): `playStation` при старте не-YouTube станции сбрасывает `state.ytQueue` и `resetSeekState()` — гейт `ytQueue && nativeLength > 0` больше не проходит на устаревших значениях от предыдущего YouTube.
+- Якоря регрессии добавлены в `playback-guard.test.js` и `youtube-seek.test.js`.
+
+### Сборка и публикация
+
+- Версия поднята до 3.5.4 везде: csproj (`Version`/`AssemblyVersion`/`FileVersion`), `?v=` в index.html (3 ссылки), installer/CatLuRadio.iss, «О программе» (TranslationManager.js, renderer.js), бейдж README; тест `version-consistency` — OK (3.5.4, ссылок `?v=`: 3).
+- Проверено: 8/8 node-тестов, `dotnet build` (Debug) — 0 ошибок, `dotnet publish -c Release -r win-x64 --self-contained true`.
+- Готовый установщик: `release/CatLuRadio-3.5.4-Standalone-Setup-desktop.exe` (358 195 632 байт, SHA-256 `522B72729BB789725677383A36EE0CD4CD27FB5200BECB112206F41BF1AA035F`).
+- Опубликован релиз `v3.5.4`: `https://github.com/Maksimasz/CatLuRadioNET/releases/tag/v3.5.4`; установщик `CatLuRadio-3.5.4-Standalone-Setup-desktop.exe` загружен ассетом (апдейтер смотрит на `releases/latest`).

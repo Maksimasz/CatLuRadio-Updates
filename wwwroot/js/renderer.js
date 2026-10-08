@@ -3756,7 +3756,7 @@ function setupIPCListeners() {
   });
   
   register('onShowAbout', () => {
-    showToast(t('CatLu Radio NET v3.5.3\n\nПриложение для прослушивания интернет-радио.'), 'info');
+    showToast(t('CatLu Radio NET v3.5.4\n\nПриложение для прослушивания интернет-радио.'), 'info');
   });
   
   // При выгрузке страницы помечаем закрытие: stopPlay() в этом случае не
