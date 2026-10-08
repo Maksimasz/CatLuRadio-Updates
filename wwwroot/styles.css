@@ -858,14 +858,18 @@ body {
 }
 
 /* Перемотка YouTube: строка под названием трека в «Сейчас играет».
-   Полоса тонкая, но с увеличенной зоной захвата — ей удобно метаться. */
+   Размеры ужаты специально: колонка details ограничена overflow:hidden —
+   при щедрых отступах последняя кнопка (⏭) обрезалась (баг со скриншота
+   2026-10-08). На совсем узких колонках время прячется container-запросом,
+   кнопки остаются всегда. */
 .seek-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   min-width: 0;
   padding: 2px 0;
+  container-type: inline-size;
 }
 
 .seek-btn {
@@ -873,7 +877,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 3px;
+  padding: 2px;
   border: none;
   border-radius: 50%;
   background: transparent;
@@ -891,11 +895,19 @@ body {
 
 .seek-time {
   flex-shrink: 0;
-  min-width: 32px;
+  min-width: 26px;
   text-align: center;
   font-size: 11px;
   color: rgba(0, 0, 0, 0.6);
   font-variant-numeric: tabular-nums;
+}
+
+/* Узкая колонка: без времени панель гарантированно влезает
+   (минимум ≈ 150px против ≈ 200px с временем). */
+@container (max-width: 250px) {
+  .seek-time {
+    display: none;
+  }
 }
 
 [data-theme="dark"] .seek-time {
@@ -905,7 +917,7 @@ body {
 .seek-track {
   position: relative;
   flex: 1;
-  min-width: 40px;
+  min-width: 32px;
   height: 7px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.12);

@@ -75,8 +75,13 @@ for (const id of ['seekControls', 'seekTrack', 'seekFill', 'seekTimeCurrent', 's
   if (!html.includes(`id="${id}"`)) throw new Error(`В index.html нет #${id}`);
 }
 const css = read('wwwroot', 'styles.css');
-for (const marker of ['.seek-controls', '.seek-track', '.seek-fill']) {
+for (const marker of ['.seek-controls', '.seek-track', '.seek-fill', 'container-type: inline-size', '@container (max-width: 250px)']) {
   if (!css.includes(marker)) throw new Error(`В styles.css нет "${marker}"`);
+}
+// Колонка now-playing-details — overflow:hidden: без ужатых размеров и
+// container-запроса последняя кнопка (⏭) обрезалась на узких окнах.
+if (!css.includes('gap: 6px')) {
+  throw new Error('.seek-controls снова расточительный (gap) — ⏭ начнёт обрезаться');
 }
 
 // ——— Переводы: title кнопок обязаны найтись в словарях дословно ———
