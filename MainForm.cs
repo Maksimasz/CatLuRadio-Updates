@@ -76,7 +76,7 @@ namespace CatLuRadio
             nativeVlc = new LibVLC("--no-video", "--network-caching=1000");
             nativePlayer = new MediaPlayer(nativeVlc);
             nativePlayer.Playing += (_, _) => nativeStart?.TrySetResult(true);
-            nativePlayer.EncounteredError += (_, _) => nativeStart?.TrySetResult(false);
+            nativePlayer.EncounteredError += (_, _) => { nativeStart?.TrySetResult(false); OnNativeError(); };
             // Конец текущего файла (не потока): страница решает, что делать —
             // для YouTube-очереди это сигнал перейти к следующему треку.
             nativePlayer.EndReached += (_, _) => OnNativeEnded();
@@ -273,7 +273,11 @@ namespace CatLuRadio
                 {
                     case "getStore":
                         string key = data["key"]?.ToString() ?? "";
-                        SendCallback(callbackId, storeData[key]?.ToString() ?? "null");
+                        // Скалярные значения (например stationsVersion) у JValue
+                        // ToString() отдаёт без кавычек — JSON.parse на странице
+                        // падал и версия всегда читалась как null (лишний merge
+                        // станций при каждом старте). Сериализуем как JSON.
+                        SendCallback(callbackId, storeData[key] is null ? "null" : JsonConvert.SerializeObject(storeData[key]));
                         break;
                     case "setStore":
                         key = data["key"]?.ToString() ?? "";
@@ -466,15 +470,49 @@ namespace CatLuRadio
         // Обработчик вызывается из потока libvlc: только BeginInvoke, никаких
         // вызовов самого плеера из этого потока (классический deadlock VLC).
         private void OnNativeEnded() {
+            // EndReached приходит с фонового потока libvlc, а свойство CoreWebView2
+            // вне UI-потока само бросает InvalidOperationException ("can only be
+            // accessed from the UI thread") — guard в тихий catch это глотал,
+            // страница не получала nativeEnded и очередь YouTube замирала после
+            // первого трека. Как и в SendCallback, сначала переезжаем на UI-поток.
             try {
+                if (InvokeRequired) { BeginInvoke(OnNativeEnded); return; }
+            } catch (Exception ex) {
+                AppLog.Error("nativeEnded: BeginInvoke не прошёл", ex);
+                return;
+            }
+            AppLog.Info("LibVLC: EndReached — двигаем очередь (nativeEnded)");
+            try {
+                if (!IsHandleCreated || webView?.CoreWebView2 is null) {
+                    AppLog.Warn($"nativeEnded: веб-вью не готова (handle={IsHandleCreated}, webView={(webView is null ? "null" : "ok")})");
+                    return;
+                }
+                webView.CoreWebView2.PostWebMessageAsString(
+                    JsonConvert.SerializeObject(new { @event = "nativeEnded" }));
+                AppLog.Info("nativeEnded: событие отправлено в страницу");
+            } catch (Exception ex) {
+                AppLog.Error("nativeEnded: не удалось отправить событие", ex);
+            }
+        }
+
+        // Поток умер посреди игры (обрыв сети, 403 от googlevideo): страница
+        // должна узнать об этом событием — без него очередь молчит после обрыва,
+        // а кнопка Play зовёт resumeNative на мёртвом медиа и ничего не делает.
+        // Как и OnNativeEnded: только BeginInvoke, без вызовов плеера из
+        // потока libvlc.
+        private void OnNativeError() {
+            // EncounteredError тоже приходит с потока libvlc: вне UI-потока
+            // чтение CoreWebView2 бросает InvalidOperationException (см. OnNativeEnded),
+            // поэтому сначала BeginInvoke, и только на UI-потоке — guard и отправка.
+            AppLog.Warn("LibVLC: ошибка потока воспроизведения");
+            try {
+                if (InvokeRequired) { BeginInvoke(OnNativeError); return; }
                 if (!IsHandleCreated || webView?.CoreWebView2 is null) return;
-                BeginInvoke(() => {
-                    try {
-                        webView.CoreWebView2.PostWebMessageAsString(
-                            JsonConvert.SerializeObject(new { @event = "nativeEnded" }));
-                    } catch { /* веб-вью уже закрыто */ }
-                });
-            } catch { /* окно закрывается */ }
+                webView.CoreWebView2.PostWebMessageAsString(
+                    JsonConvert.SerializeObject(new { @event = "nativeError" }));
+            } catch (Exception ex) {
+                AppLog.Error("nativeError: не удалось отправить событие", ex);
+            }
         }
 
         // Список треков YouTube-плейлиста (или одиночного видео) для добавления
@@ -582,7 +620,12 @@ namespace CatLuRadio
             }
             nativeEqualizer = new Equalizer();
             for (uint index = 0; index < nativeEqualizer.BandCount && index < values.Count; index++) {
-                nativeEqualizer.SetAmp(Math.Clamp(values[index]?.Value<float>() ?? 0, -12, 12), index);
+                // Индексатор JArray принимает только int/string: uint давал
+                // ArgumentException ("Int32 array index expected") до SendCallback —
+                // страница висела 20 секунд на каждый запуск трека, и за это
+                // время у коротких треков успевало сработать nativeEnded,
+                // которое guard isSwitching молча отбрасывал.
+                nativeEqualizer.SetAmp(Math.Clamp(values[(int)index]?.Value<float>() ?? 0, -12, 12), index);
             }
             var success = nativePlayer.SetEqualizer(nativeEqualizer);
             if (!success) { nativeEqualizer.Dispose(); nativeEqualizer = null; }

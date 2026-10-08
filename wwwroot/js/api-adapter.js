@@ -252,10 +252,13 @@ window.AppAPI = {
     resumeNative: () => WebView2API.resumeNative(),
     stopNative: () => WebView2API.stopNative(),
     setNativeVolume: (volume) => WebView2API.setNativeVolume(volume),
+    setNativeEqualizer: (values) => WebView2API.setNativeEqualizer(values),
     resolveYoutubePlaylist: (url) => WebView2API.resolveYoutubePlaylist(url),
     resolveYoutubeTrack: (videoId) => WebView2API.resolveYoutubeTrack(videoId),
-    // nativeEnded — единственное push-событие хоста (трек доиграл в LibVLC)
+    // nativeEnded — push-событие хоста (трек доиграл в LibVLC),
+    // nativeError — поток умер посреди игры (обрыв сети, 403 от googlevideo).
     onNativeEnded: (handler) => WebView2API.onHostEvent('nativeEnded', handler),
+    onNativeError: (handler) => WebView2API.onHostEvent('nativeError', handler),
     searchOnlineStations: async (name = '', country = '', portal = 'all') => {
         const include = source => portal === 'all' || portal === source;
         let radioBrowser = [];

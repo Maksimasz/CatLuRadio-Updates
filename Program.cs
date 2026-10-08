@@ -1,10 +1,47 @@
 using System;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace CatLuRadio
 {
     internal static class Program
     {
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        // Имя объекта ядра привязано к каталогу данных: копия с другим
+        // каталогом (тестовая сборка) не считается «вторым экземпляром».
+        // '\' в имени задаёт пространство ядра, поэтому спецсимволы пути
+        // заменяем на '_'.
+        private static string SingleInstanceName()
+        {
+            string dataRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CatLuRadio");
+            return @"Local\CatLuRadioNET_" + dataRoot.Replace('\\', '_').Replace(':', '_');
+        }
+
+        // Найденная вторая копия лишь выводит первое окно на первый план —
+        // пользователь не должен получить два плеера с общим хранилищем.
+        private static void FocusExistingInstance()
+        {
+            try
+            {
+                foreach (Process process in Process.GetProcessesByName("CatLuRadio"))
+                {
+                    if (process.Id == Environment.ProcessId || process.MainWindowHandle == IntPtr.Zero) continue;
+                    ShowWindow(process.MainWindowHandle, 9); // SW_RESTORE
+                    SetForegroundWindow(process.MainWindowHandle);
+                    break;
+                }
+            }
+            catch { /* фокус не критичен для запуска */ }
+        }
+
         [STAThread]
         static void Main()
         {
@@ -17,6 +54,18 @@ namespace CatLuRadio
             // и Tyrrrz/Deorcify, Initializer.cs). Ставим её до первого обращения к
             // YoutubeExplode; на пользователей это никак не влияет.
             Environment.SetEnvironmentVariable("SLAVA_UKRAINI", "1");
+
+            // Один живой экземпляр на каталог данных: две копии затирают
+            // станции друг друга общими записями store и играют одновременно
+            // (биения громкости). Вторая копия лишь активирует первое окно.
+            // Ссылка переживает Application.Run через GC.KeepAlive ниже —
+            // иначе mutex может быть собран до выхода и «второй» стартует.
+            var singleInstanceMutex = new Mutex(true, SingleInstanceName(), out bool isFirstInstance);
+            if (!isFirstInstance)
+            {
+                FocusExistingInstance();
+                return;
+            }
 
             ApplicationConfiguration.Initialize();
 
@@ -46,6 +95,7 @@ namespace CatLuRadio
 
             AppLog.Info("Запуск приложения " + Application.ProductVersion);
             Application.Run(new MainForm());
+            GC.KeepAlive(singleInstanceMutex);
             AppLog.Info("Завершение приложения");
         }
     }

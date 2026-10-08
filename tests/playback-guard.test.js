@@ -41,8 +41,18 @@ if (!source.includes("typeof window.AppAPI?.[name] === 'function'")) throw new E
 
 const adapter = fs.readFileSync(path.join(__dirname, '..', 'wwwroot', 'js', 'api-adapter.js'), 'utf8');
 const index = fs.readFileSync(path.join(__dirname, '..', 'wwwroot', 'index.html'), 'utf8');
-if (!source.includes('setNativeEqualizer') || !adapter.includes('setNativeEqualizer:')) throw new Error('Эквалайзер не передаётся в libVLC');
-if (!source.includes('state.nativeAudio = true;\n      await window.AppAPI.setNativeEqualizer')) throw new Error('Эквалайзер libVLC включается до старта потока');
+// Проверяем именно фасад AppAPI, а не только WebView2API: раньше привязка
+// была внутри WebView2API, фасад её не прокидывал — и окно вызова
+// window.AppAPI.setNativeEqualizer падало TypeError, роняя очередь YouTube.
+if (!source.includes('setNativeEqualizer') || !adapter.includes('setNativeEqualizer: (values) => WebView2API.setNativeEqualizer(values)')) throw new Error('Эквалайзер не передаётся в libVLC');
+// Эквалайзер применяется после старта потока (state.nativeAudio = true).
+for (const m of source.matchAll(/await window\.AppAPI\.setNativeEqualizer/g)) {
+    if (source.lastIndexOf('state.nativeAudio = true;', m.index) === -1) throw new Error('Эквалайзер libVLC включается до старта потока');
+}
+// …и его вызов не фатален: сбой (нет функции, таймаут хоста) раньше
+// обрывал playYoutubeTrack до сброса isSwitching — очередь умирала после
+// первого трека, а повторный запуск молча ничего не делал.
+if (!source.includes("catch (e) { console.warn('Эквалайзер LibVLC не применился:', e); }")) throw new Error('Сбой эквалайзера фатален для запуска станции');
 if (!adapter.includes('response.success ?? response.Success')) throw new Error('HTTP-ответ C# не приводится к формату поиска');
 if (!adapter.includes("typeof result === 'string' ? JSON.parse(result) : result")) throw new Error('HTTP-ответ-объект повторно разбирается как JSON');
 if (!adapter.includes("success: response?.success ?? response?.Success")) throw new Error('Проверка потока не приводит поле Success из C#');

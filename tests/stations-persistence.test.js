@@ -108,6 +108,19 @@ assert.ok(
   'нет восстановления станций из истории по избранному — старые потери не залечатся'
 );
 
+// 5) getStore обязан отдавать JSON: JValue.ToString() для stationsVersion
+//    отдавал «1.0.3» без кавычек — JSON.parse падал на каждом старте, версия
+//    читалась как null и merge станций гонялся даже при совпадении версий.
+const mainForm = read('MainForm.cs');
+assert.ok(
+  mainForm.includes('JsonConvert.SerializeObject(storeData[key])'),
+  'getStore должен сериализовать значение как JSON, а не ToString()'
+);
+assert.ok(
+  !mainForm.includes('storeData[key]?.ToString()'),
+  'getStore через ToString() вернулся — версии станций снова не будут читаться'
+);
+
 // ——— Разметка: модуль подключён до renderer ———
 const html = read('wwwroot', 'index.html');
 const cleanupTag = html.indexOf('station-cleanup.js');

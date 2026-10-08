@@ -41,6 +41,47 @@ if (!stopPlayBody || !stopPlayBody[0].includes('ytQueue = null')) {
   throw new Error('stopPlay() не сбрасывает state.ytQueue — очередь оживёт после остановки');
 }
 
+// ——— Устойчивость после первого трека (фикс 2026-10-08) ———
+// Тогда очередь умирала после первой песни: у window.AppAPI не было привязки
+// setNativeEqualizer (только в WebView2API), TypeError обрывал playYoutubeTrack
+// до сброса isSwitching — handleNativeEnded отбрасывался по guard'у, а
+// playYoutubeStation молча не стартовал. Каждая часть цепочки ниже обязательна.
+const adapterFacade = [
+  'setNativeEqualizer: (values) => WebView2API.setNativeEqualizer(values)',
+  'onNativeError: (handler) => WebView2API.onHostEvent'
+];
+for (const marker of adapterFacade) {
+  if (!adapter.includes(marker)) throw new Error(`В фасаде AppAPI нет "${marker}"`);
+}
+if (!renderer.includes('catch (e) { console.warn(\'Эквалайзер LibVLC не применился:\', e); }')) {
+  throw new Error('Сбой эквалайзера фатален — playYoutubeTrack оборвётся до сброса isSwitching');
+}
+if (!renderer.includes('YouTube: сбой запуска трека') ||
+    !/if \(started\) \{[\s\S]{0,200}?state\.isSwitching = false;/.test(renderer)) {
+  throw new Error('Внешний catch playYoutubeTrack не разблокирует isSwitching — очередь навечно зависнет');
+}
+if (!renderer.includes('function handleNativeError') ||
+    !renderer.includes('register(\'onNativeError\', handleNativeError)')) {
+  throw new Error('Страница не обрабатывает событие nativeError — после обрыва потока кнопка Play молчит');
+}
+if (!main.includes('nativeError') || !main.includes('OnNativeError')) {
+  throw new Error('MainForm.cs не пробрасывает EncounteredError на страницу как nativeError');
+}
+// Кнопка Play после останови очереди должна перезапускать станцию, а не
+// молча ничего не делать («больше не запускается»).
+if (!renderer.includes('Не удалось перезапустить станцию')) {
+  throw new Error('togglePlay() не перезапускает станцию, когда плеер встал');
+}
+
+// ——— Один экземпляр на каталог данных ———
+// Две живые копии делили один store_v2.json (вторая затирала станции первой,
+// включая добавленные YouTube-плейлисты) и играли одновременно — отсюда
+// «плавающая громкость» из-за биений двух потоков одной станции.
+const program = read('Program.cs');
+for (const marker of ['SingleInstanceName', 'isFirstInstance', 'FocusExistingInstance', 'GC.KeepAlive(singleInstanceMutex)']) {
+  if (!program.includes(marker)) throw new Error(`В Program.cs нет "${marker}" — защита от двух экземпляров не работает`);
+}
+
 // ——— Разметка и переводы ———
 const html = read('wwwroot', 'index.html');
 if (!html.includes('addYtPlaylistBtn') || !html.includes('ytPlaylistUrl')) {

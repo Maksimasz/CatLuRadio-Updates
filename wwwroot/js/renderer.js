@@ -1081,7 +1081,10 @@ async function playStation(station) {
     const nativeResult = await window.AppAPI.playNative(streamUrl, state.volume);
     if (nativeResult?.success) {
       state.nativeAudio = true;
-      await window.AppAPI.setNativeEqualizer(state.settings.equalizer?.values || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+      // Эквалайзер — косметика: его сбой не должен ронять запуск станции.
+      try {
+        await window.AppAPI.setNativeEqualizer(state.settings.equalizer?.values || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+      } catch (e) { console.warn('Эквалайзер LibVLC не применился:', e); }
       state.isPlaying = true;
       rememberLastStation(station);
       state.isSwitching = false;
@@ -1140,29 +1143,51 @@ async function playYoutubeTrack(requestedIndex) {
   const count = queue.tracks.length;
   queue.index = ((requestedIndex % count) + count) % count;
   const track = queue.tracks[queue.index];
+  let started = false;
 
-  const resolved = await window.AppAPI.resolveYoutubeTrack(track.id);
-  if (!resolved?.success || !resolved.url) {
-    await skipYoutubeTrack(track, resolved?.error);
-    return;
-  }
+  try {
+    const resolved = await window.AppAPI.resolveYoutubeTrack(track.id);
+    if (!resolved?.success || !resolved.url) {
+      await skipYoutubeTrack(track, resolved?.error);
+      return;
+    }
 
-  const nativeResult = await window.AppAPI.playNative(resolved.url, state.volume);
-  if (nativeResult?.success) {
-    state.nativeAudio = true;
-    await window.AppAPI.setNativeEqualizer(state.settings.equalizer?.values || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    state.isPlaying = true;
-    queue.misses = 0;
-    rememberLastStation(state.currentStation);
-    state.isSwitching = false;
-    updatePlayButton();
-    const label = track.author ? `${track.title} — ${track.author}` : track.title;
-    updateNowPlaying(label, track.title);
-    renderStations(state.stations);
-    renderFavorites();
-    return;
+    const nativeResult = await window.AppAPI.playNative(resolved.url, state.volume);
+    if (nativeResult?.success) {
+      started = true;
+      state.nativeAudio = true;
+      // Эквалайзер — косметика поверх звука: его сбой (нет функции, таймаут
+      // хоста) не должен ронять очередь. Раньше TypeError здесь останавливал
+      // функцию до сброса isSwitching — очередь умирала после первого трека,
+      // а повторный запуск молча не работал.
+      try {
+        await window.AppAPI.setNativeEqualizer(state.settings.equalizer?.values || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+      } catch (e) { console.warn('Эквалайзер LibVLC не применился:', e); }
+      state.isPlaying = true;
+      queue.misses = 0;
+      rememberLastStation(state.currentStation);
+      state.isSwitching = false;
+      updatePlayButton();
+      const label = track.author ? `${track.title} — ${track.author}` : track.title;
+      updateNowPlaying(label, track.title);
+      renderStations(state.stations);
+      renderFavorites();
+      return;
+    }
+    await skipYoutubeTrack(track, t('LibVLC не начал воспроизведение'));
+  } catch (error) {
+    // Любая неожиданная ошибка не должна навечно заблокировать isSwitching:
+    // трек уже играет — просто разблокируем управление, трек не запустился —
+    // пропускаем его по общим правилам (три пропуска подряд и очередь встаёт).
+    console.error('YouTube: сбой запуска трека:', error);
+    if (started) {
+      state.isSwitching = false;
+      state.isPlaying = true;
+      updatePlayButton();
+    } else {
+      await skipYoutubeTrack(track, error?.message || String(error));
+    }
   }
-  await skipYoutubeTrack(track, t('LibVLC не начал воспроизведение'));
 }
 
 /**
@@ -1210,6 +1235,28 @@ function handleNativeEnded() {
     console.error('Ошибка перехода к следующему треку YouTube:', error);
     state.isSwitching = false;
   });
+}
+
+// Событие nativeError: LibVLC умер посреди игры (обрыв сети, 403 от
+// googlevideo). Без него страница не узнаёт о смерти плеера: очередь молчит,
+// а кнопка Play вызывает resumeNative на мёртвом медиа и ничего не делает.
+function handleNativeError() {
+  const queue = state.ytQueue;
+  if (queue && !state.isSwitching && state.isPlaying) {
+    // Трактуем как неудачный трек: пропуск по общим правилам с лимитом в три.
+    skipYoutubeTrack(queue.tracks[queue.index], 'LibVLC: ошибка потока').catch((error) => {
+      console.error('Ошибка после обрыва потока LibVLC:', error);
+      state.isSwitching = false;
+    });
+    return;
+  }
+  if (!state.nativeAudio || !state.isPlaying) return;
+  console.warn('LibVLC: поток прервался, останавливаем воспроизведение');
+  state.isPlaying = false;
+  state.nativeAudio = false;
+  updatePlayButton();
+  updateNowPlaying('—');
+  showToast(t('Воспроизведение прервано: поток недоступен'), 'error');
 }
 
 
@@ -1870,6 +1917,14 @@ function togglePlay() {
   }
 
   if (!state.audio) {
+    // Плеер встал (очередь остановлена после трёх пропусков, поток умер):
+    // кнопка Play молча ничего не делала — «не запускается». Если станция
+    // ещё помнится, запускаем её заново.
+    if (state.currentStation) {
+      playStation(state.currentStation).catch((error) => {
+        console.error('Не удалось перезапустить станцию:', error);
+      });
+    }
     return;
   }
   
@@ -3477,8 +3532,10 @@ function setupIPCListeners() {
   });
 
   // YouTube-очередь: хост сообщает событием nativeEnded, что трек доиграл
-  // до конца, — двигаем очередь к следующему.
+  // до конца, — двигаем очередь к следующему. nativeError — поток умер
+  // посреди игры, очередь пропускает трек по общим правилам.
   register('onNativeEnded', handleNativeEnded);
+  register('onNativeError', handleNativeError);
   
   register('onStopAllAudio', () => {
     stopAllAudio();
