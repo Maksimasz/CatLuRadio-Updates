@@ -1411,6 +1411,23 @@ function setupSeekControls() {
   };
   if (backBtn) backBtn.addEventListener('click', () => nudge(-10));
   if (fwdBtn) fwdBtn.addEventListener('click', () => nudge(10));
+
+  // ⏮/⏭ — переключение треков очереди. Тот же заход, что у nativeEnded:
+  // guard isSwitching от двойного клика, зацикленный переход через
+  // playYoutubeTrack (счётчик по модулю длины — с последнего на первый).
+  const switchTrack = (delta) => {
+    const queue = state.ytQueue;
+    if (!queue || state.isSwitching) return;
+    state.isSwitching = true;
+    playYoutubeTrack(queue.index + delta).catch((error) => {
+      console.error('Ошибка переключения трека YouTube:', error);
+      state.isSwitching = false;
+    });
+  };
+  const prevBtn = document.getElementById('seekPrevTrackBtn');
+  const nextBtn = document.getElementById('seekNextTrackBtn');
+  if (prevBtn) prevBtn.addEventListener('click', () => switchTrack(-1));
+  if (nextBtn) nextBtn.addEventListener('click', () => switchTrack(1));
 }
 
 

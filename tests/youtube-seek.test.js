@@ -35,12 +35,26 @@ for (const marker of [
 
 // ——— Страница (renderer) ———
 const renderer = read('wwwroot', 'js', 'renderer.js');
-for (const marker of ['handleNativeTime', 'updateSeekUI', 'setupSeekControls', 'resetSeekState', 'formatSeekTime']) {
+for (const marker of ['handleNativeTime', 'updateSeekUI', 'setupSeekControls', 'resetSeekState', 'formatSeekTime', 'switchTrack']) {
   if (!renderer.includes(marker)) throw new Error(`В renderer.js нет "${marker}"`);
 }
 // Подписка на событие позиции: без неё полоса никогда не обновится.
 if (!renderer.includes("register('onNativeTime', handleNativeTime)")) {
   throw new Error('renderer.js не подписан на onNativeTime');
+}
+// ⏮/⏭ обязаны водить очередью через playYoutubeTrack (и глушить двойной клик).
+if (!renderer.includes('playYoutubeTrack(queue.index + delta)')) {
+  throw new Error('Кнопки ⏮/⏭ не переключают треки очереди через playYoutubeTrack');
+}
+if (!renderer.includes('if (!queue || state.isSwitching) return;')) {
+  throw new Error('Переключение треков без guard\'а isSwitching — двойной клик запустит два трека');
+}
+// ——— Управление видно только у YouTube ———
+// Гейт по очереди YouTube: state.ytQueue существует только у YouTube-станций,
+// у обычного радио его нет — панель скрыта даже если нативный плеер
+// сообщит какую-то длительность стрима.
+if (!renderer.includes('const visible = Boolean(state.ytQueue) && state.nativeLength > 0;')) {
+  throw new Error('updateSeekUI потерял гейт по очереди YouTube — панель будет видна на обычном радио');
 }
 // Полоса живёт ровно до остановки — вместе с очередью YouTube.
 const stopPlayBody = renderer.match(/function stopPlay\(\) \{[\s\S]*?\n\}/);
@@ -57,7 +71,7 @@ if (!renderer.slice(trackIdx, trackIdx + 1500).includes('resetSeekState();')) {
 
 // ——— UI: полоса в index.html и её стили ———
 const html = read('wwwroot', 'index.html');
-for (const id of ['seekControls', 'seekTrack', 'seekFill', 'seekTimeCurrent', 'seekTimeTotal', 'seekBackBtn', 'seekFwdBtn']) {
+for (const id of ['seekControls', 'seekTrack', 'seekFill', 'seekTimeCurrent', 'seekTimeTotal', 'seekBackBtn', 'seekFwdBtn', 'seekPrevTrackBtn', 'seekNextTrackBtn']) {
   if (!html.includes(`id="${id}"`)) throw new Error(`В index.html нет #${id}`);
 }
 const css = read('wwwroot', 'styles.css');
@@ -69,8 +83,8 @@ for (const marker of ['.seek-controls', '.seek-track', '.seek-fill']) {
 // Ключ словаря — исходный русский текст: одна переставленная буква (так
 // однажды затесалась еврейская ד) и EN/LT/HE остаются с русским title.
 const tm = read('wwwroot', 'modules', 'TranslationManager.js');
-const titles = [...html.matchAll(/title="(Перемотать[^"]+)"/g)].map((m) => m[1]);
-if (titles.length < 2) throw new Error('В index.html не найдены title кнопок перемотки');
+const titles = [...html.matchAll(/seek-btn[^>]*title="([^"]+)"/g)].map((m) => m[1]);
+if (titles.length < 4) throw new Error('В index.html не найдены title кнопок панели управления (ожидалось не меньше 4)');
 for (const title of titles) {
   if (!tm.includes(`'${title}'`)) {
     throw new Error(`В TranslationManager.js нет ключа для title "${title}"`);
