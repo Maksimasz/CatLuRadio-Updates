@@ -306,6 +306,18 @@
         </div>
         
             <div class="settings-section" style="margin-top: 20px;">
+              <h3>YouTube-плейлист</h3>
+              <p class="settings-description">Добавьте плейлист, видео или YouTube-радио по ссылке — он заиграет очередью в основном плеере, с эквалайзером и историей.</p>
+              <div class="form-group">
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="ytPlaylistUrl" placeholder="https://www.youtube.com/playlist?list=..." style="flex: 1;">
+                  <button id="addYtPlaylistBtn" class="btn btn-primary">➕ Добавить плейлист</button>
+                </div>
+              </div>
+              <div id="ytPlaylistMessage" class="message"></div>
+            </div>
+        
+            <div class="settings-section" style="margin-top: 20px;">
               <h3>Импорт/Экспорт станций</h3>
               <p class="settings-description">Экспортируйте все ваши станции в JSON файл или импортируйте станции из файла расширения браузера.</p>
               <div class="import-export-buttons">

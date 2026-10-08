@@ -8,6 +8,16 @@ namespace CatLuRadio
         [STAThread]
         static void Main()
         {
+            // NuGet-пакет YoutubeExplode содержит региональную блокировку (модуль
+            // Deorcify от автора библиотеки): на системной локали ru-RU/by-RU при
+            // первом обращении к библиотеке показывается модалка «Restricted region»
+            // и процесс завершается через Environment.Exit(1) — приложение падало бы
+            // у таких пользователей ещё до старта. Автор предлагает документированный
+            // обход — переменная окружения SLAVA_UKRAINI=1 (см. текст самого диалога
+            // и Tyrrrz/Deorcify, Initializer.cs). Ставим её до первого обращения к
+            // YoutubeExplode; на пользователей это никак не влияет.
+            Environment.SetEnvironmentVariable("SLAVA_UKRAINI", "1");
+
             ApplicationConfiguration.Initialize();
 
             // Без этих обработчиков любое необработанное исключение превращалось

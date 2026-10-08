@@ -122,6 +122,18 @@ const TranslationManager = {
 
       // ——— Настройки: управление станциями ———
       'Добавить станцию': 'Add station',
+
+      // ——— Настройки: YouTube-плейлист ———
+      'YouTube-плейлист': 'YouTube playlist',
+      'Добавьте плейлист, видео или YouTube-радио по ссылке — он заиграет очередью в основном плеере, с эквалайзером и историей.': 'Add a playlist, video or YouTube radio by link — it will play as a queue in the main player, with the equalizer and history.',
+      '➕ Добавить плейлист': '➕ Add playlist',
+      'Плейлист пуст': 'Playlist is empty',
+      'Вставьте ссылку на плейлист YouTube': 'Paste a YouTube playlist link',
+      'Загружаем плейлист…': 'Loading playlist…',
+      'Не удалось загрузить плейлист: {error}': 'Failed to load playlist: {error}',
+      'Плейлист добавлен: {n} треков': 'Playlist added: {n} tracks',
+      'LibVLC не начал воспроизведение': 'LibVLC did not start playback',
+      'Не удалось воспроизвести плейлист: {name}': 'Failed to play playlist: {name}',
       'Название станции:': 'Station name:',
       'Например: Моя Радиостанция': 'e.g. My Radio Station',
       'URL потока:': 'Stream URL:',
@@ -389,6 +401,19 @@ const TranslationManager = {
       'Настройки сохранены!': 'Nustatymai išsaugoti!',
 
       'Добавить станцию': 'Pridėti stotį',
+
+      // ——— YouTube grojaraštis ———
+      'YouTube-плейлист': 'YouTube grojaraštis',
+      'Добавьте плейлист, видео или YouTube-радио по ссылке — он заиграет очередью в основном плеере, с эквалайзером и историей.': 'Įrašykite grojaraštį, vaizdo įrašą ar YouTube radiją pagal nuorodą — jis gros eilėje pagrindiniame grotuve, su ekvalaizeriu ir istorija.',
+      '➕ Добавить плейлист': '➕ Pridėti grojaraštį',
+      'Плейлист пуст': 'Grojaraštis tuščias',
+      'Вставьте ссылку на плейлист YouTube': 'Įklijuokite YouTube grojaraščio nuorodą',
+      'Загружаем плейлист…': 'Įkeliamas grojaraštis…',
+      'Не удалось загрузить плейлист: {error}': 'Nepavyko įkelti grojaraščio: {error}',
+      'Плейлист добавлен: {n} треков': 'Grojaraštis pridėtas: {n} takelio (-ių)',
+      'LibVLC не начал воспроизведение': 'LibVLC nepradėjo leisti',
+      'Не удалось воспроизвести плейлист: {name}': 'Nepavyko paleisti grojaraščio: {name}',
+      'Неизвестная ошибка': 'Nežinoma klaida',
       'Название станции:': 'Stoties pavadinimas:',
       'Например: Моя Радиостанция': 'Pvz.: Mano radijo stotis',
       'URL потока:': 'Srauto URL:',
@@ -570,6 +595,19 @@ const TranslationManager = {
       'Настройки сохранены!': 'ההגדרות נשמרו!',
 
       'Добавить станцию': 'הוספת תחנה',
+
+      // ——— YouTube: רשימת השמעה ———
+      'YouTube-плейлист': 'רשימת השמעה ב-YouTube',
+      'Добавьте плейлист, видео или YouTube-радио по ссылке — он заиграет очередью в основном плеере, с эквалайзером и историей.': 'הוסיפו רשימת השמעה, סרטון או רדיו מ-YouTube דרך קישור — הוא ינוגן בתור בתנגן הראשי, עם אקвал라이זר והיסטוריה.',
+      '➕ Добавить плейлист': '➕ הוספת רשימת השמעה',
+      'Плейлист пуст': 'רשימת ההשמעה ריקה',
+      'Вставьте ссылку на плейлист YouTube': 'הדביקו קישור לרשימת השמעה ב-YouTube',
+      'Загружаем плейлист…': 'טוענים רשימת השמעה…',
+      'Не удалось загрузить плейлист: {error}': 'טעינת רשימת ההשמעה נכשלה: {error}',
+      'Плейлист добавлен: {n} треков': 'רשימת ההשמעה נוספה: {n} רצועות',
+      'LibVLC не начал воспроизведение': 'LibVLC לא התחיל נגינה',
+      'Не удалось воспроизвести плейлист: {name}': 'הנגינה ברשימת ההשמעה נכשלה: {name}',
+      'Неизвестная ошибка': 'שגיאה לא ידועה',
       'Название станции:': 'שם התחנה:',
       'Например: Моя Радиостанция': 'לדוגמה: הרדיו שלי',
       'URL потока:': 'כתובת הסטרימינג:',

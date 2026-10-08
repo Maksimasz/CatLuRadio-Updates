@@ -41,6 +41,7 @@
 - 🖥 **Мини-плеер** — сверните окно в компактный плеер и управляйте воспроизведением, не отвлекаясь.
 - 🔄 **Автообновления** — проверка при запуске и установка новой версии одной кнопкой (Настройки → Система).
 - ⚙️ **Полное управление станциями** — добавление, редактирование, удаление, импорт/экспорт и режим редактирования всех станций.
+- 📺 **Плейлисты YouTube** — вставьте ссылку на плейлист, видео или YouTube-радио (Настройки → Станции) — он заиграет очередью в LibVLC: с эквалайзером, историей и избранным; недоступные треки пропускаются, очередь зациклена как радио.
 
 ## 🖼 Скриншоты
 
@@ -100,7 +101,7 @@ iscc installer\CatLuRadio.iss   # результат — release/CatLuRadio-*-St
 
 ## 🧪 Тесты
 
-Пять наборов на Node.js — запускаются по одному:
+Шесть наборов на Node.js — запускаются по одному:
 
 ```powershell
 node tests\line-endings.test.js            # LF в файлах, от которых зависят grep-проверки
@@ -108,6 +109,7 @@ node tests\version-consistency.test.js     # <Version> в csproj ↔ ?v= в inde
 node tests\playback-guard.test.js          # защита логики воспроизведения
 node tests\equalizer-normalization.test.js # эквалайзер и нормализация громкости
 node tests\api-adapter-timeout.test.js     # таймауты моста WebView2
+node tests\youtube-queue.test.js           # YouTube-плейлисты: резолвер, nativeEnded, очередь
 ```
 
 ## 🗂 Структура проекта
@@ -123,7 +125,7 @@ CatLuRadio/
 │   ├── js/api-adapter.js      # мост WebView2 (в браузере — безопасный фолбэк)
 │   └── modules/               # TranslationManager · ThemeManager · Equalizer …
 ├── installer/CatLuRadio.iss   # скрипт Inno Setup
-├── tests/                     # 5 наборов node-тестов
+├── tests/                     # 6 наборов node-тестов
 ├── docs/screenshots/          # скриншоты для этого README
 └── _history/                  # дневник развития проекта
 ```

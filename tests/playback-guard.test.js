@@ -31,9 +31,11 @@ if (!source.includes('setInterval(checkAllStations, 15 * 60 * 1000)')) throw new
 if (!source.includes("searchOnlineStations(query, country === 'all' ? '' : country, portal)")) throw new Error('Портал не передаётся в интернет-поиск');
 if (!source.includes("preview: true") || !source.includes("!station.preview")) throw new Error('Предпрослушивание не отделено от добавления');
 if (!source.includes("!state.settings.scheduler?.schedules?.[index] || !confirm(t('Удалить это расписание?'))")) throw new Error('Удаление расписания не подтверждается');
-// Мост событий C#→страницы не существует (MainForm шлёт только ответы по
-// callbackId), поэтому прямой вызов window.AppAPI.on* роняет init() дальше:
-// без перевоводов, проверки обновлений и автозапуска последней станции.
+// Событий от C# почти нет: MainForm отвечает по callbackId, а в качестве
+// push-события шлёт только nativeEnded (конец трека YouTube-очереди). Любые
+// on*-вызовы поэтому идут через register() с typeof-проверкой: прямой
+// window.AppAPI.on* роняет init() дальше — без переводов, проверки обновлений
+// и автозапуска последней станции.
 if (/window\.AppAPI\.on[A-Z]/.test(source)) throw new Error('IPC-слушатели вызывают несуществующие on*-события AppAPI и обрывают init()');
 if (!source.includes("typeof window.AppAPI?.[name] === 'function'")) throw new Error('IPC-слушатели не проверяют, есть ли событие у AppAPI');
 

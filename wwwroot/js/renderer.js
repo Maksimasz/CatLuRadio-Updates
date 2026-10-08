@@ -7,6 +7,7 @@ let state = {
   favorites: [],
   history: [], // История прослушанных станций (последние 50)
   currentStation: null,
+  ytQueue: null, // Очередь YouTube-плейлиста: { stationId, tracks, index, misses }
   audio: null,
   isPlaying: false,
   volume: 0.5, // Громкость по умолчанию 50%
@@ -974,6 +975,11 @@ async function playStation(station) {
   if (state.currentStation && state.currentStation.id === station.id && state.isPlaying) {
     return;
   }
+
+  // YouTube-плейлист — очередь треков, у неё свой путь запуска
+  if (station.type === 'youtube-playlist') {
+    return playYoutubeStation(station);
+  }
   
   // Установить флаг переключения
   state.isSwitching = true;
@@ -1088,6 +1094,121 @@ async function playStation(station) {
   // Резервный путь: LibVLC не запустил поток или включён кроссфейд —
   // дальше воспроизведение идёт через <audio>/HLS/Web Audio в самой странице.
   await playInBrowserPlayer({ station, streamUrl, useCrossfade, crossfadeDuration });
+}
+
+
+/**
+ * YouTube-плейлист: очередь треков поверх LibVLC.
+ *
+ * Ссылки на аудио YouTube (googlevideo) живут несколько часов и привязаны к IP,
+ * поэтому каждый трек резолвится непосредственно перед запуском
+ * (AppAPI.resolveYoutubeTrack), а по естественному концу трека хост шлёт
+ * событие nativeEnded — на нём очередь сама переходит к следующему.
+ * Кроссфейд не применяется: треки разной длительности, и между ними LibVLC
+ * сам ставит границу файла.
+ */
+async function playYoutubeStation(station) {
+  if (state.isSwitching) return;
+
+  // Общая остановка: гасит LibVLC, <audio>, HLS и сбрасывает прошлую очередь
+  stopPlay();
+
+  const tracks = Array.isArray(station.ytTracks) ? station.ytTracks : [];
+  if (!tracks.length) {
+    showToast(t('Плейлист пуст'), 'error');
+    return;
+  }
+
+  state.isSwitching = true;
+  state.currentStation = station;
+  state.ytQueue = { stationId: station.id, tracks, index: 0, misses: 0 };
+  await playYoutubeTrack(0);
+}
+
+/**
+ * Запуск одного трека очереди: сначала резолв аудио-потока, потом playNative.
+ * requestedIndex берётся по модулю длины — очередь зациклена как радио.
+ */
+async function playYoutubeTrack(requestedIndex) {
+  const queue = state.ytQueue;
+  if (!queue || !queue.tracks.length) {
+    state.isSwitching = false;
+    return;
+  }
+
+  const count = queue.tracks.length;
+  queue.index = ((requestedIndex % count) + count) % count;
+  const track = queue.tracks[queue.index];
+
+  const resolved = await window.AppAPI.resolveYoutubeTrack(track.id);
+  if (!resolved?.success || !resolved.url) {
+    await skipYoutubeTrack(track, resolved?.error);
+    return;
+  }
+
+  const nativeResult = await window.AppAPI.playNative(resolved.url, state.volume);
+  if (nativeResult?.success) {
+    state.nativeAudio = true;
+    await window.AppAPI.setNativeEqualizer(state.settings.equalizer?.values || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    state.isPlaying = true;
+    queue.misses = 0;
+    rememberLastStation(state.currentStation);
+    state.isSwitching = false;
+    updatePlayButton();
+    const label = track.author ? `${track.title} — ${track.author}` : track.title;
+    updateNowPlaying(label, track.title);
+    renderStations(state.stations);
+    renderFavorites();
+    return;
+  }
+  await skipYoutubeTrack(track, t('LibVLC не начал воспроизведение'));
+}
+
+/**
+ * Трек недоступен (возрастной, региональный, истёкший манифест) — пропускаем.
+ * После трёх неудач подряд останавливаемся: так полностью нерабочий плейлист
+ * не крутится в вечном цикле.
+ */
+async function skipYoutubeTrack(track, error) {
+  const queue = state.ytQueue;
+  if (!queue) {
+    state.isSwitching = false;
+    return;
+  }
+
+  queue.misses = (queue.misses || 0) + 1;
+  console.warn(`YouTube: трек «${track.title}» не играет (${error || 'нет аудио'}), пропускаем`);
+
+  if (queue.misses >= Math.min(queue.tracks.length, 3)) {
+    stopYoutubeQueue();
+    showToast(t('Не удалось воспроизвести плейлист: {name}', { name: state.currentStation?.name || '' }), 'error');
+    return;
+  }
+
+  // Пауза перед следующим: LibVLC только что отказал и должен отпустить поток
+  await new Promise(resolve => setTimeout(resolve, 400));
+  await playYoutubeTrack(queue.index + 1);
+}
+
+function stopYoutubeQueue() {
+  state.ytQueue = null;
+  state.isSwitching = false;
+  state.isPlaying = false;
+  window.AppAPI.stopNative();
+  state.nativeAudio = false;
+  updatePlayButton();
+  updateNowPlaying('—');
+}
+
+// Событие nativeEnded: трек доиграл естественно — двигаем очередь дальше.
+function handleNativeEnded() {
+  const queue = state.ytQueue;
+  if (!queue || state.isSwitching || !state.isPlaying) return;
+  state.isSwitching = true;
+  playYoutubeTrack(queue.index + 1).catch((error) => {
+    console.error('Ошибка перехода к следующему треку YouTube:', error);
+    state.isSwitching = false;
+  });
 }
 
 
@@ -1769,6 +1890,8 @@ function stopPlay() {
   
   // Сбросить флаг переключения при остановке
   state.isSwitching = false;
+  // Очередь YouTube живёт ровно до остановки: nativeEnded её больше не тронет
+  state.ytQueue = null;
 
   window.AppAPI.stopNative();
   state.nativeAudio = false;
@@ -1877,13 +2000,13 @@ function updatePlayButton() {
 }
 
 // Обновление информации о текущей станции
-function updateNowPlaying(stationName) {
+function updateNowPlaying(stationName, titleOverride) {
   // Обновление медиа-сессии для мобильных устройств
   if ('mediaSession' in navigator && state.currentStation) {
     try {
       const station = state.currentStation;
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: station.name || stationName || t('Радиостанция'),
+        title: titleOverride || station.name || stationName || t('Радиостанция'),
         artist: station.genre || t('Интернет-радио'),
         album: 'CatLu Radio NET',
         artwork: station.image ? [
@@ -2385,6 +2508,12 @@ function setupEventListeners() {
   // Добавление станции
   document.getElementById('addStationBtn').addEventListener('click', async () => {
     await addStation();
+  });
+
+  // Добавление YouTube-плейлиста по ссылке
+  document.getElementById('addYtPlaylistBtn').addEventListener('click', addYoutubePlaylist);
+  document.getElementById('ytPlaylistUrl').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addYoutubePlaylist();
   });
   
   // Обновление станции (кнопка "Сохранить изменения")
@@ -3039,6 +3168,79 @@ function editStation(stationId) {
 }
 
 // Обновление станции
+/**
+ * Импорт YouTube-плейлиста по ссылке в станции.
+ * Хост один раз разбирает ссылку (список треков + обложка), треки кладутся
+ * в станцию целиком — сами аудио-потоки резолвятся только перед запуском.
+ */
+async function addYoutubePlaylist() {
+  const input = document.getElementById('ytPlaylistUrl');
+  const button = document.getElementById('addYtPlaylistBtn');
+  const messageEl = document.getElementById('ytPlaylistMessage');
+  const url = (input?.value || '').trim();
+
+  if (!url) {
+    if (messageEl) {
+      messageEl.textContent = t('Вставьте ссылку на плейлист YouTube');
+      messageEl.className = 'message error';
+    }
+    return;
+  }
+
+  if (button) button.disabled = true;
+  if (messageEl) {
+    messageEl.textContent = t('Загружаем плейлист…');
+    messageEl.className = 'message';
+  }
+
+  try {
+    const result = await window.AppAPI.resolveYoutubePlaylist(url);
+    const tracks = Array.isArray(result?.tracks) ? result.tracks : [];
+
+    if (!result?.success || !tracks.length) {
+      if (messageEl) {
+        messageEl.textContent = result?.success
+          ? t('Плейлист пуст')
+          : t('Не удалось загрузить плейлист: {error}', { error: result?.error || t('Неизвестная ошибка') });
+        messageEl.className = 'message error';
+      }
+      return;
+    }
+
+    const station = {
+      id: 'yt-' + Date.now(),
+      name: result.title || t('YouTube-плейлист'),
+      url,
+      country: 'OTHER',
+      genre: 'YouTube',
+      source: 'YouTube',
+      type: 'youtube-playlist',
+      image: result.thumbnail || '',
+      ytTracks: tracks
+    };
+
+    state.stations.push(station);
+    await window.AppAPI.saveStations(state.stations);
+    renderStations(state.stations);
+    renderFavorites();
+
+    const success = t('Плейлист добавлен: {n} треков', { n: tracks.length });
+    if (input) input.value = '';
+    if (messageEl) {
+      messageEl.textContent = success;
+      messageEl.className = 'message success';
+    }
+    showToast(success, 'success');
+  } catch (error) {
+    if (messageEl) {
+      messageEl.textContent = t('Не удалось загрузить плейлист: {error}', { error: error.message });
+      messageEl.className = 'message error';
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 async function updateStation(stationId) {
   const name = document.getElementById('stationName').value.trim();
   const url = document.getElementById('stationUrl').value.trim();
@@ -3271,6 +3473,10 @@ function setupIPCListeners() {
   register('onStopPlay', () => {
     stopPlay();
   });
+
+  // YouTube-очередь: хост сообщает событием nativeEnded, что трек доиграл
+  // до конца, — двигаем очередь к следующему.
+  register('onNativeEnded', handleNativeEnded);
   
   register('onStopAllAudio', () => {
     stopAllAudio();

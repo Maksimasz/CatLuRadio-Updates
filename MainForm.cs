@@ -13,6 +13,8 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using YoutubeExplode;
+using YoutubeExplode.Videos.Streams;
 
 namespace CatLuRadio
 {
@@ -44,6 +46,9 @@ namespace CatLuRadio
         private Media? nativeMedia;
         private Equalizer? nativeEqualizer;
         private TaskCompletionSource<bool>? nativeStart;
+        // Резолвер YouTube (NuGet YoutubeExplode): списки плейлистов и прямые
+        // аудио-потоки для очереди YouTube-плейлистов.
+        private readonly YoutubeClient ytClient = new();
         private const string UpdatesApiUrl = "https://api.github.com/repos/Maksimasz/CatLuRadioNET/releases/latest";
         private const string UpdateAssetPrefix = "https://github.com/Maksimasz/CatLuRadioNET/releases/download/";
 
@@ -72,6 +77,9 @@ namespace CatLuRadio
             nativePlayer = new MediaPlayer(nativeVlc);
             nativePlayer.Playing += (_, _) => nativeStart?.TrySetResult(true);
             nativePlayer.EncounteredError += (_, _) => nativeStart?.TrySetResult(false);
+            // Конец текущего файла (не потока): страница решает, что делать —
+            // для YouTube-очереди это сигнал перейти к следующему треку.
+            nativePlayer.EndReached += (_, _) => OnNativeEnded();
             LoadStore();
             InitializeComponent();
         }
@@ -285,6 +293,12 @@ namespace CatLuRadio
                     case "checkStream":
                         _ = CheckStream(data["url"]?.ToString() ?? "", callbackId);
                         break;
+                    case "resolveYoutubePlaylist":
+                        _ = ResolveYoutubePlaylist(data["url"]?.ToString() ?? "", callbackId);
+                        break;
+                    case "resolveYoutubeTrack":
+                        _ = ResolveYoutubeTrack(data["videoId"]?.ToString() ?? "", callbackId);
+                        break;
                     case "playNative":
                         _ = PlayNative(data["url"]?.ToString() ?? "", data["volume"]?.Value<double>() ?? 0.5, callbackId);
                         break;
@@ -447,6 +461,117 @@ namespace CatLuRadio
             nativeMedia?.Dispose();
             nativeMedia = null;
         }
+
+        // Трек доиграл естественно — сообщаем странице событием (без callbackId).
+        // Обработчик вызывается из потока libvlc: только BeginInvoke, никаких
+        // вызовов самого плеера из этого потока (классический deadlock VLC).
+        private void OnNativeEnded() {
+            try {
+                if (!IsHandleCreated || webView?.CoreWebView2 is null) return;
+                BeginInvoke(() => {
+                    try {
+                        webView.CoreWebView2.PostWebMessageAsString(
+                            JsonConvert.SerializeObject(new { @event = "nativeEnded" }));
+                    } catch { /* веб-вью уже закрыто */ }
+                });
+            } catch { /* окно закрывается */ }
+        }
+
+        // Список треков YouTube-плейлиста (или одиночного видео) для добавления
+        // в станции. Запрашивается один раз при импорте: сами ссылки на аудио
+        // здесь не нужны — они истекают и резолвятся перед каждым треком.
+        private async Task ResolveYoutubePlaylist(string url, string callbackId) {
+            try {
+                var (playlistId, videoId) = ParseYoutubeUrl(url);
+                if (playlistId is null && videoId is null) {
+                    SendCallback(callbackId, new { success = false, error = "Не похоже на ссылку YouTube" });
+                    return;
+                }
+
+                string title = "", author = "", thumbnail = "";
+                var tracks = new JArray();
+
+                if (playlistId is not null) {
+                    var playlist = await ytClient.Playlists.GetAsync(playlistId);
+                    title = playlist.Title;
+                    author = playlist.Author?.ChannelTitle ?? "";
+                    await foreach (var video in ytClient.Playlists.GetVideosAsync(playlistId)) {
+                        if (tracks.Count >= 200) break;
+                        tracks.Add(TrackJson(video.Id.Value, video.Title, video.Author?.ChannelTitle, video.Duration));
+                        if (thumbnail.Length == 0 && video.Thumbnails.Count > 0)
+                            thumbnail = video.Thumbnails[^1].Url;
+                    }
+                } else {
+                    var video = await ytClient.Videos.GetAsync(videoId!);
+                    title = video.Title;
+                    author = video.Author?.ChannelTitle ?? "";
+                    if (video.Thumbnails.Count > 0) thumbnail = video.Thumbnails[^1].Url;
+                    tracks.Add(TrackJson(video.Id.Value, video.Title, video.Author?.ChannelTitle, video.Duration));
+                }
+
+                if (tracks.Count == 0) {
+                    SendCallback(callbackId, new { success = false, error = "Плейлист пуст" });
+                    return;
+                }
+                SendCallback(callbackId, new { success = true, title, author, thumbnail, tracks });
+            } catch (Exception ex) { SendCallback(callbackId, new { success = false, error = ex.Message }); }
+        }
+
+        // Прямая ссылка на аудио одного трека. Вызывается непосредственно перед
+        // запуском: googlevideo URL живёт несколько часов и привязан к IP,
+        // поэтому кешировать его бессмысленно.
+        private async Task ResolveYoutubeTrack(string videoId, string callbackId) {
+            if (string.IsNullOrWhiteSpace(videoId)) {
+                SendCallback(callbackId, new { success = false, error = "Пустой идентификатор видео" });
+                return;
+            }
+            try {
+                var manifest = await ytClient.Videos.Streams.GetManifestAsync(videoId);
+                var audio = manifest.GetAudioOnlyStreams().GetWithHighestBitrate();
+                if (audio is null) {
+                    SendCallback(callbackId, new { success = false, error = "Аудио-поток не найден" });
+                    return;
+                }
+                SendCallback(callbackId, new { success = true, url = audio.Url, container = audio.Container.Name });
+            } catch (Exception ex) { SendCallback(callbackId, new { success = false, error = ex.Message }); }
+        }
+
+        private static JObject TrackJson(string id, string title, string? channelTitle, TimeSpan? duration) {
+            return new JObject {
+                ["id"] = id,
+                ["title"] = title,
+                ["author"] = channelTitle ?? "",
+                ["duration"] = (int)(duration ?? TimeSpan.Zero).TotalSeconds
+            };
+        }
+
+        // Понимает основные формы ссылок: playlist?list=..., watch?v=...&list=...,
+        // youtu.be/ID, shorts/ID, live/ID. Плейлист важнее одиночного видео:
+        // watch?v=X&list=RD... — это «радио» вокруг видео X.
+        private static (string? PlaylistId, string? VideoId) ParseYoutubeUrl(string url) {
+            if (!Uri.TryCreate(url?.Trim(), UriKind.Absolute, out var uri)) return (null, null);
+            string? list = QueryParam(uri, "list");
+            string? video = QueryParam(uri, "v");
+            if (string.IsNullOrWhiteSpace(video)) {
+                var segments = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (segments.Length >= 2 && segments[0] is "shorts" or "embed" or "live" or "v") video = segments[1];
+                else if (uri.Host.Contains("youtu.be", StringComparison.OrdinalIgnoreCase)) video = segments.FirstOrDefault();
+            }
+            return (
+                string.IsNullOrWhiteSpace(list) ? null : list,
+                string.IsNullOrWhiteSpace(video) ? null : video
+            );
+        }
+
+        private static string? QueryParam(Uri uri, string name) {
+            foreach (var pair in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)) {
+                var parts = pair.Split('=', 2);
+                if (string.Equals(Uri.UnescapeDataString(parts[0]), name, StringComparison.OrdinalIgnoreCase))
+                    return parts.Length > 1 ? Uri.UnescapeDataString(parts[1].Replace('+', ' ')) : "";
+            }
+            return null;
+        }
+
         private void SetNativeEqualizer(JArray? values, string callbackId) {
             nativeEqualizer?.Dispose();
             nativeEqualizer = null;

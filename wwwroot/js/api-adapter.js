@@ -19,7 +19,11 @@ const ACTION_TIMEOUT_MS = {
     showOpenDialog: 10 * 60 * 1000,
     showSaveDialog: 10 * 60 * 1000,
     // Установщик качается целиком, на медленной линии это минуты.
-    installUpdate: 30 * 60 * 1000
+    installUpdate: 30 * 60 * 1000,
+    // YouTube: список плейлиста (до 200 треков) и резолв аудио-потока
+    // одного трека — на медленном соединении оба могут думать дольше 20 с.
+    resolveYoutubePlaylist: 60 * 1000,
+    resolveYoutubeTrack: 30 * 1000
 };
 
 function sendToNative(action, data = {}, timeoutMs = null) {
@@ -59,6 +63,12 @@ if (window.chrome && window.chrome.webview) {
     window.chrome.webview.addEventListener('message', (event) => {
         try {
             const data = JSON.parse(event.data);
+            // События хоста (nativeEnded и т.п.): приходят без callbackId и
+            // рассылаются всем слушателям как DOM-события host:<имя>.
+            if (data && typeof data.event === 'string') {
+                window.dispatchEvent(new CustomEvent('host:' + data.event, { detail: data }));
+                return;
+            }
             const id = data.callbackId;
             // Читаем resultRaw вместо result
             const result = data.resultRaw;
@@ -131,6 +141,12 @@ const WebView2API = {
     stopNative: () => sendToNative('stopNative'),
     setNativeVolume: (volume) => sendToNative('setNativeVolume', { volume }),
     setNativeEqualizer: (values) => sendToNative('setNativeEqualizer', { values }),
+    // YouTube: список треков плейлиста при добавлении + аудио-поток трека
+    // непосредственно перед запуском (ссылки googlevideo истекают).
+    resolveYoutubePlaylist: (url) => sendToNative('resolveYoutubePlaylist', { url }),
+    resolveYoutubeTrack: (videoId) => sendToNative('resolveYoutubeTrack', { videoId }),
+    // Подписка на события хоста (например nativeEnded — трек доиграл).
+    onHostEvent: (name, handler) => window.addEventListener('host:' + name, handler),
 
     async showOpenDialog() {
         try {
@@ -236,6 +252,10 @@ window.AppAPI = {
     resumeNative: () => WebView2API.resumeNative(),
     stopNative: () => WebView2API.stopNative(),
     setNativeVolume: (volume) => WebView2API.setNativeVolume(volume),
+    resolveYoutubePlaylist: (url) => WebView2API.resolveYoutubePlaylist(url),
+    resolveYoutubeTrack: (videoId) => WebView2API.resolveYoutubeTrack(videoId),
+    // nativeEnded — единственное push-событие хоста (трек доиграл в LibVLC)
+    onNativeEnded: (handler) => WebView2API.onHostEvent('nativeEnded', handler),
     searchOnlineStations: async (name = '', country = '', portal = 'all') => {
         const include = source => portal === 'all' || portal === source;
         let radioBrowser = [];
