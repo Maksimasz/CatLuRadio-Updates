@@ -44,8 +44,8 @@ namespace CatLuRadio
         private Media? nativeMedia;
         private Equalizer? nativeEqualizer;
         private TaskCompletionSource<bool>? nativeStart;
-        private const string UpdatesApiUrl = "https://api.github.com/repos/Maksimasz/CatLuRadio-Updates/releases/latest";
-        private const string UpdateAssetPrefix = "https://github.com/Maksimasz/CatLuRadio-Updates/releases/download/";
+        private const string UpdatesApiUrl = "https://api.github.com/repos/Maksimasz/CatLuRadioNET/releases/latest";
+        private const string UpdateAssetPrefix = "https://github.com/Maksimasz/CatLuRadioNET/releases/download/";
 
         private class ApiResponse
         {

@@ -22,7 +22,7 @@
 <a href="#-скриншоты">🖼 Скриншоты</a> •
 <a href="#-установка">📦 Установка</a> •
 <a href="#️-запуск-из-исходников">▶️ Запуск</a> •
-<a href="https://github.com/Maksimasz/CatLuRadio-Updates/releases/latest">🚀 Скачать</a>
+<a href="https://github.com/Maksimasz/CatLuRadioNET/releases/latest">🚀 Скачать</a>
 
 </div>
 
@@ -73,7 +73,7 @@
 
 ## 📦 Установка
 
-1. Откройте **[последний выпуск](https://github.com/Maksimasz/CatLuRadio-Updates/releases/latest)** и скачайте установщик последней версии.
+1. Откройте **[последний выпуск](https://github.com/Maksimasz/CatLuRadioNET/releases/latest)** и скачайте установщик последней версии.
 2. Запустите его и следуйте подсказкам (приложение ставится в `Program Files`, ярлык появится в меню «Пуск»).
 3. **Обновление поверх старой версии** сохраняет все станции, избранное, историю и настройки.
 
@@ -86,8 +86,8 @@
 Требования: Windows 10/11 x64, [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), WebView2 Runtime.
 
 ```powershell
-git clone https://github.com/Maksimasz/CatLuRadio-Updates.git
-cd CatLuRadio-Updates
+git clone https://github.com/Maksimasz/CatLuRadioNET.git
+cd CatLuRadioNET
 dotnet run
 ```
 

@@ -72,7 +72,7 @@ if (!source.includes('onlineStationKey(station.name)') || !source.includes('back
 if (source.includes("${found.codec || '?'} ${found.bitrate || '?'} kbps")) throw new Error('В результатах поиска остались кодек и битрейт');
 if (!source.includes('checkForUpdates();') || !source.includes('installAvailableUpdate')) throw new Error('Проверка обновлений при запуске не подключена');
 if (!adapter.includes("checkForUpdate: () => sendToNative('checkForUpdate')")) throw new Error('Проверка обновлений не передаётся в приложение');
-if (!index.includes('id="system"') || !index.includes('id="checkUpdateBtn"') || !index.includes('Maksimasz/CatLuRadio-Updates')) throw new Error('Обновления не размещены в разделе системы');
+if (!index.includes('id="system"') || !index.includes('id="checkUpdateBtn"') || !index.includes('Maksimasz/CatLuRadioNET')) throw new Error('Обновления не размещены в разделе системы');
 
 // alert() блокирует страницу: при серии ошибок воспроизведения складывалась
 // стопка одинаковых системных окон, которые надо закрывать руками. Всё, что
