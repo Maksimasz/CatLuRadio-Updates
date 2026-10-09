@@ -374,3 +374,4 @@
 - Версия поднята до 3.5.5 везде: csproj (`Version`/`AssemblyVersion`/`FileVersion`), `?v=` в index.html (3 ссылки), installer/CatLuRadio.iss, «О программе» (TranslationManager.js, renderer.js), бейдж README; тест `version-consistency` — OK.
 - Проверено: 8/8 node-тестов, `dotnet build` (Debug) — 0 ошибок, `dotnet publish -c Release -r win-x64 --self-contained true`.
 - Готовый установщик: `release/CatLuRadio-3.5.5-Standalone-Setup-desktop.exe` (358 176 803 байт, SHA-256 `8C79D66E6D2E3A35C479CE66FF688924B7A3F7740492E034140394F7ED10CB2F`).
+- Опубликован релиз `v3.5.5`: `https://github.com/Maksimasz/CatLuRadioNET/releases/tag/v3.5.5` (id 407536226); установщик `CatLuRadio-3.5.5-Standalone-Setup-desktop.exe` загружен ассетом (апдейтер смотрит на `releases/latest`).
