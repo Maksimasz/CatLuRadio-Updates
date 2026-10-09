@@ -220,6 +220,8 @@ async function init() {
 
   console.log('[INIT] Инициализация завершена за', (performance.now() - initStartTime).toFixed(0), 'мс');
   window.AppAPI.log?.(`init ${Math.round(performance.now() - initStartTime)} мс`);
+  // Первая оценка: не требует ли контент минимальной ширины окна шире заданной
+  scheduleWindowMinWidthSync();
   checkForUpdates();
 
   // Даём WebView2 завершить инициализацию до старта потока.
@@ -2317,6 +2319,9 @@ function toggleMiniPlayer() {
       miniPlayer.style.display = 'none';
       
       window.AppAPI?.setMiniPlayer?.(false);
+      // Хост вернул окну стандартный размер и минимум — пересчитать ширину
+      // под фактический контент (см. syncWindowMinWidth).
+      scheduleWindowMinWidthSync();
     }
     
     // Сохранить настройки
@@ -2683,6 +2688,13 @@ function setupEventListeners() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab;
+      // Шестерёнка работает как переключатель: открыть настройки,
+      // а будучи открытой — закрыть их и вернуться к плееру.
+      if (tab === 'settings' &&
+          document.getElementById('settings-tab')?.classList.contains('active')) {
+        switchTab(settingsReturnTab || 'stations');
+        return;
+      }
       switchTab(tab);
     });
   });
@@ -2847,6 +2859,8 @@ function setupEventListeners() {
       applyTranslations();
     }
     saveData();
+    // Длина надписей зависит от языка — пересчитать минимальную ширину окна
+    scheduleWindowMinWidthSync();
   });
   
   // Изменение темы
@@ -2932,13 +2946,13 @@ function setupEventListeners() {
     }
     schedulerEnabled.checked = state.settings.scheduler.enabled || false;
     if (schedulerControls) {
-      schedulerControls.style.display = schedulerEnabled.checked ? 'block' : 'none';
+      schedulerControls.style.display = schedulerEnabled.checked ? 'flex' : 'none';
     }
     
     schedulerEnabled.addEventListener('change', (e) => {
       state.settings.scheduler.enabled = e.target.checked;
       if (schedulerControls) {
-        schedulerControls.style.display = e.target.checked ? 'block' : 'none';
+        schedulerControls.style.display = e.target.checked ? 'flex' : 'none';
       }
       if (e.target.checked) {
         initScheduler();
@@ -3320,7 +3334,16 @@ function applyAudioProcessingChange() {
 }
 
 // Переключение вкладок
+// Вкладка, на которую вернётся плеер при закрытии настроек крестиком
+let settingsReturnTab = 'stations';
+
 function switchTab(tabName) {
+  const activeBtn = document.querySelector('.tab-btn.active');
+  const prevTab = activeBtn ? activeBtn.dataset.tab : null;
+  if (tabName === 'settings' && prevTab && prevTab !== 'settings') {
+    settingsReturnTab = prevTab;
+  }
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.remove('active');
   });
@@ -3332,11 +3355,70 @@ function switchTab(tabName) {
   document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
   document.getElementById(`${tabName}-tab`).classList.add('active');
   
+  // Режим настроек: в строке вкладок остаются только шестерёнка/крестик —
+  // без дубля меню; крестик закрывает настройки и возвращает к плееру.
+  const settingsOpen = tabName === 'settings';
+  document.body.classList.toggle('settings-open', settingsOpen);
+  const settingsBtn = document.querySelector('[data-tab="settings"]');
+  if (settingsBtn) {
+    const label = settingsOpen ? t('Закрыть настройки') : t('Настройки');
+    settingsBtn.title = label;
+    settingsBtn.setAttribute('aria-label', label);
+  }
+
   if (tabName === 'favorites') {
     renderFavorites();
   } else if (tabName === 'history') {
     renderHistory();
   }
+
+  // Содержимое другой вкладки может требовать другой минимальной ширины окна
+  scheduleWindowMinWidthSync();
+}
+
+// ===== Адаптивная ширина окна =====
+// Минимальная ширина подстраивается под фактический контент: если компонентам
+// нужно на пару пикселей шире (длинные подписи после смены языка, ряды кнопок),
+// окно подрастает вместе с ними, а не обрезает их.
+let appliedMinWindowWidth = 500;
+let windowMinWidthTimer = null;
+
+function measureRequiredWindowWidth() {
+  const viewportRight = document.documentElement.clientWidth;
+  let maxRight = 0;
+  document.querySelectorAll('.container *').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    // Элементы внутри горизонтально прокручиваемых контейнеров
+    // (полосы вкладок, полосы эквалайзера) скроллятся сами — их не учитываем.
+    for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+      const overflowX = getComputedStyle(parent).overflowX;
+      if (overflowX === 'auto' || overflowX === 'scroll') return;
+      if (parent === document.body) break;
+    }
+    if (rect.right > viewportRight && rect.right > maxRight) {
+      maxRight = rect.right;
+    }
+  });
+  return maxRight > 0 ? Math.ceil(maxRight) + 8 : 0;
+}
+
+function syncWindowMinWidth() {
+  if (!window.AppAPI || typeof window.AppAPI.setWindowMinimumSize !== 'function') return;
+  const needed = measureRequiredWindowWidth();
+  if (needed > appliedMinWindowWidth) {
+    appliedMinWindowWidth = needed;
+    window.AppAPI.setWindowMinimumSize(needed, 500);
+    // Окно уже упёрлось в свой минимум — расширить его до нужной ширины
+    if (window.innerWidth < needed) {
+      window.AppAPI.setWindowSize(needed, document.documentElement.clientHeight);
+    }
+  }
+}
+
+function scheduleWindowMinWidthSync() {
+  clearTimeout(windowMinWidthTimer);
+  windowMinWidthTimer = setTimeout(syncWindowMinWidth, 250);
 }
 
 // Добавление станции
@@ -3688,6 +3770,12 @@ function applyTheme(theme) {
   }
   
   document.documentElement.setAttribute('data-theme', actualTheme);
+  // Компонентные правила тем работают по общему режиму (светлый/тёмный)
+  const darkThemes = ['dark', 'spotify', 'amoled'];
+  document.documentElement.setAttribute(
+    'data-mode',
+    darkThemes.includes(actualTheme) ? 'dark' : 'light'
+  );
 }
 
 // Сохранение настроек

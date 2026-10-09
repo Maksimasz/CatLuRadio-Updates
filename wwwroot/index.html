@@ -65,9 +65,13 @@
       <button class="tab-btn" data-tab="history">История</button>
       <button class="tab-btn" data-tab="equalizer">Эквалайзер</button>
       <button class="tab-btn tab-btn-icon" data-tab="settings" title="Настройки" aria-label="Настройки">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <svg class="gear-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="3"></circle>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <svg class="close-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
       </button>
     </div>
@@ -196,23 +200,28 @@
 
         <!-- Основные настройки -->
         <div class="settings-panel active" id="basic-settings">
-            <div class="form-group">
-              <label for="languageSelect">Язык интерфейса:</label>
-              <select id="languageSelect">
-                <option value="auto">Авто (системный)</option>
-                <option value="en">English</option>
-                <option value="ru">Русский</option>
-                <option value="lt">Lietuvių</option>
-                <option value="he">עברית</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="themeSelect">Тема оформления:</label>
-              <select id="themeSelect">
-                <option value="light">Светлая</option>
-                <option value="dark">Темная</option>
-                <option value="system">Системная</option>
-              </select>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="languageSelect">Язык интерфейса:</label>
+                <select id="languageSelect">
+                  <option value="auto">Авто (системный)</option>
+                  <option value="en">English</option>
+                  <option value="ru">Русский</option>
+                  <option value="lt">Lietuvių</option>
+                  <option value="he">עברית</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="themeSelect">Тема оформления:</label>
+                <select id="themeSelect">
+                  <option value="light">Светлая</option>
+                  <option value="dark">Темная</option>
+                  <option value="system">Системная</option>
+                  <option value="spotify">Spotify</option>
+                  <option value="apple">Apple Music</option>
+                  <option value="amoled">AMOLED</option>
+                </select>
+              </div>
             </div>
             <div class="form-group">
               <label>
@@ -232,7 +241,9 @@
                 Режим редактирования (позволяет редактировать все станции, включая предустановленные)
               </label>
             </div>
-            <button id="saveSettingsBtn" class="btn btn-primary">Сохранить настройки</button>
+            <div class="form-buttons">
+              <button id="saveSettingsBtn" class="btn btn-primary">Сохранить настройки</button>
+            </div>
             <div id="settingsMessage" class="message"></div>
         </div>
         
@@ -253,9 +264,10 @@
                 <button id="extractRadioPotokBtn" class="btn btn-secondary" title="Извлечь поток из RadioPotok (введите ссылку на скрипт: https://radiopotok.ru/f/script6.1/4.js)">📻 RadioPotok</button>
               </div>
             </div>
-            <div class="form-group">
-              <label for="stationCountry">Страна:</label>
-              <select id="stationCountry">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="stationCountry">Страна:</label>
+                <select id="stationCountry">
                 <optgroup label="СНГ">
                   <option value="RU">Россия</option><option value="AM">Армения</option><option value="AZ">Азербайджан</option><option value="BY">Беларусь</option><option value="KZ">Казахстан</option><option value="KG">Кыргызстан</option><option value="MD">Молдова</option><option value="TJ">Таджикистан</option><option value="TM">Туркменистан</option><option value="UZ">Узбекистан</option>
                 </optgroup>
@@ -290,6 +302,7 @@
                 <option value="Sports">Sports</option>
                 <option value="Other">Other</option>
               </select>
+            </div>
             </div>
             <div class="form-group">
               <label for="stationDescription">Описание (необязательно):</label>
@@ -564,6 +577,8 @@
       document.querySelectorAll('.settings-nav-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.panel === id);
       });
+      // Содержимое панели может требовать другой минимальной ширины окна
+      if (typeof scheduleWindowMinWidthSync === 'function') scheduleWindowMinWidthSync();
     }
 
     // renderer.js вызывает toggleAccordion('...') — открываем нужную панель

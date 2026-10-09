@@ -100,6 +100,104 @@
   }
 }
 
+/* ===== Современные музыкальные темы ===== */
+
+/* Spotify — фирменный зелёный на почти-чёрном (стандарт музыкальных приложений) */
+[data-theme="spotify"] {
+  --md-primary: #1db954;
+  --md-primary-variant: #1ed760;
+  --md-secondary: #b3b3b3;
+  --md-background: #121212;
+  --md-surface: #181818;
+  --md-error: #ff6b6b;
+  --md-on-primary: #000000;
+  --md-on-secondary: #000000;
+  --md-on-background: #ffffff;
+  --md-on-surface: #ffffff;
+  --md-on-error: #000000;
+  --md-shadow: rgba(0, 0, 0, 0.5);
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --md-elevation-2: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --md-elevation-4: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  --card-bg: #1f1f1f;
+  --card-border: #2e2e2e;
+  --hover-tint: rgba(255, 255, 255, 0.07);
+  --subtle-text: rgba(255, 255, 255, 0.65);
+  --accent-tint: rgba(29, 185, 84, 0.16);
+
+  --md-outline: #2e2e2e;
+  --md-outline-variant: #2a2a2a;
+  --md-on-surface-variant: rgba(255, 255, 255, 0.65);
+  --md-surface-container-low: #1a1a1a;
+  --md-surface-container: #1f1f1f;
+  --md-surface-container-highest: #2a2a2a;
+}
+
+/* Apple Music — светлая и яркая: чистый белый + красный акцент */
+[data-theme="apple"] {
+  --md-primary: #fa2d48;
+  --md-primary-variant: #e02540;
+  --md-secondary: #8e8e93;
+  --md-background: #f5f5f7;
+  --md-surface: #ffffff;
+  --md-error: #d70015;
+  --md-on-primary: #ffffff;
+  --md-on-secondary: #ffffff;
+  --md-on-background: #000000;
+  --md-on-surface: #000000;
+  --md-on-error: #ffffff;
+  --md-shadow: rgba(0, 0, 0, 0.16);
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --md-elevation-2: 0 2px 6px rgba(0, 0, 0, 0.09);
+  --md-elevation-4: 0 8px 24px rgba(0, 0, 0, 0.14);
+
+  --card-bg: #ffffff;
+  --card-border: #e8e8ed;
+  --hover-tint: rgba(0, 0, 0, 0.05);
+  --subtle-text: rgba(0, 0, 0, 0.55);
+  --accent-tint: rgba(250, 45, 72, 0.12);
+
+  --md-outline: #d5d5da;
+  --md-outline-variant: #eaeaef;
+  --md-on-surface-variant: rgba(0, 0, 0, 0.6);
+  --md-surface-container-low: #f7f7fa;
+  --md-surface-container: #f0f0f5;
+  --md-surface-container-highest: #e8e8ee;
+}
+
+/* AMOLED — истинно чёрный фон + неоновый фиолетовый и циан */
+[data-theme="amoled"] {
+  --md-primary: #8b5cf6;
+  --md-primary-variant: #a78bfa;
+  --md-secondary: #22d3ee;
+  --md-background: #000000;
+  --md-surface: #0a0a0f;
+  --md-error: #ff7aa8;
+  --md-on-primary: #ffffff;
+  --md-on-secondary: #000000;
+  --md-on-background: #ffffff;
+  --md-on-surface: #ffffff;
+  --md-on-error: #000000;
+  --md-shadow: rgba(0, 0, 0, 0.6);
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --md-elevation-2: 0 2px 6px rgba(0, 0, 0, 0.45);
+  --md-elevation-4: 0 8px 24px rgba(0, 0, 0, 0.55);
+
+  --card-bg: #101016;
+  --card-border: #22222e;
+  --hover-tint: rgba(255, 255, 255, 0.06);
+  --subtle-text: rgba(255, 255, 255, 0.6);
+  --accent-tint: rgba(139, 92, 246, 0.22);
+
+  --md-outline: #22222e;
+  --md-outline-variant: #1b1b26;
+  --md-on-surface-variant: rgba(255, 255, 255, 0.6);
+  --md-surface-container-low: #0c0c12;
+  --md-surface-container: #101016;
+  --md-surface-container-highest: #171722;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -198,6 +296,8 @@ body {
   justify-content: center;
   position: relative;
   white-space: nowrap;
+  overflow: hidden;
+  max-width: 100%;
 }
 
 .btn:hover {
@@ -295,11 +395,11 @@ body {
   border: 1px solid var(--card-border);
 }
 
-[data-theme="dark"] .tab-content .btn-secondary,
-[data-theme="dark"] .form-buttons .btn-secondary,
-[data-theme="dark"] .import-export-buttons .btn-secondary,
-[data-theme="dark"] .add-station-form .btn-secondary,
-[data-theme="dark"] .settings-form .btn-secondary {
+[data-mode="dark"] .tab-content .btn-secondary,
+[data-mode="dark"] .form-buttons .btn-secondary,
+[data-mode="dark"] .import-export-buttons .btn-secondary,
+[data-mode="dark"] .add-station-form .btn-secondary,
+[data-mode="dark"] .settings-form .btn-secondary {
   border-color: var(--card-border);
 }
 
@@ -442,6 +542,28 @@ body {
   display: block;
 }
 
+/* Режим настроек: в строке вкладок остаётся только шестерёнка/крестик —
+   без дубля меню; крестик закрывает настройки и возвращает к плееру. */
+.tab-btn-icon .close-icon {
+  display: none;
+}
+
+body.settings-open .tab-btn:not([data-tab="settings"]) {
+  display: none;
+}
+
+body.settings-open .tab-btn-icon {
+  margin-left: auto;
+}
+
+body.settings-open .tab-btn-icon .gear-icon {
+  display: none;
+}
+
+body.settings-open .tab-btn-icon .close-icon {
+  display: block;
+}
+
 .tab-content {
   display: none;
   flex: 1;
@@ -486,10 +608,10 @@ body {
   transition: border-color 0.1s ease;
 }
 
-[data-theme="dark"] .search-box input,
-[data-theme="dark"] .search-box select,
-[data-theme="dark"] .form-group input[type="text"],
-[data-theme="dark"] .form-group select {
+[data-mode="dark"] .search-box input,
+[data-mode="dark"] .search-box select,
+[data-mode="dark"] .form-group input[type="text"],
+[data-mode="dark"] .form-group select {
   border-color: var(--card-border);
 }
 
@@ -512,6 +634,7 @@ body {
 
 .import-export-buttons .btn {
   flex: 1;
+  min-width: 0;
   padding: 5px 12px;
   font-size: 13px;
   text-transform: none;
@@ -519,14 +642,11 @@ body {
   min-height: 28px;
 }
 
+/* Разделительная линия между секциями настроек (YouTube, станции, импорт, …) */
 .settings-section {
   margin-top: 8px;
   padding-top: 16px;
-  border-top: 1px solid rgba(0, 0, 0, 0.12);
-}
-
-[data-theme="dark"] .settings-section {
-  border-top-color: rgba(255, 255, 255, 0.12);
+  border-top: 1px solid var(--md-outline);
 }
 
 .settings-section h3 {
@@ -545,7 +665,7 @@ body {
   letter-spacing: 0.25px;
 }
 
-[data-theme="dark"] .settings-description {
+[data-mode="dark"] .settings-description {
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -688,7 +808,7 @@ body {
   background: rgba(176, 0, 32, 0.1);
 }
 
-[data-theme="dark"] .btn-delete:hover {
+[data-mode="dark"] .btn-delete:hover {
   background: rgba(207, 102, 121, 0.2);
 }
 
@@ -703,6 +823,17 @@ body {
   box-sizing: border-box;
 }
 
+/* Настройки: форма занимает высоту окна, навигация закреплена,
+   прокручивается только содержимое активной панели — списки
+   (в т.ч. планировщик) динамически растягиваются вместе с окном. */
+.settings-form {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .form-buttons {
   display: flex;
   flex-wrap: wrap;
@@ -712,6 +843,7 @@ body {
 
 .form-buttons .btn {
   flex: 1;
+  min-width: 0;
   padding: 5px 12px;
   font-size: 13px;
   min-height: 28px;
@@ -719,7 +851,7 @@ body {
 
 .add-station-form h2,
 .settings-form h2 {
-  margin-bottom: 24px;
+  margin-bottom: 12px;
   color: var(--md-on-surface);
   font-size: 24px;
   font-weight: 400;
@@ -727,17 +859,61 @@ body {
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 5px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   font-weight: 600;
   color: var(--md-on-surface);
   font-size: 13px;
   text-transform: none;
   letter-spacing: 0;
+}
+
+/* Одно поле на строке (или поле + кнопка) — растягиваем во всю длину */
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="time"],
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  background: var(--card-bg);
+  color: var(--md-on-surface);
+}
+
+.form-group textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+/* Два поля на строке — пропорционально и симметрично */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 10px;
+  align-items: end;
+  margin-bottom: 5px;
+}
+
+.form-row .form-group {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+@media (max-width: 460px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .form-group input[type="checkbox"] {
@@ -786,7 +962,7 @@ body {
   letter-spacing: 0.25px;
 }
 
-[data-theme="dark"] .empty-message {
+[data-mode="dark"] .empty-message {
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -823,7 +999,7 @@ body {
   padding-top: 2px; /* Выравнивание с первой строкой текста */
 }
 
-[data-theme="dark"] .now-playing-label {
+[data-mode="dark"] .now-playing-label {
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -910,7 +1086,7 @@ body {
   }
 }
 
-[data-theme="dark"] .seek-time {
+[data-mode="dark"] .seek-time {
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -929,7 +1105,7 @@ body {
   height: 9px;
 }
 
-[data-theme="dark"] .seek-track {
+[data-mode="dark"] .seek-track {
   background: rgba(255, 255, 255, 0.15);
 }
 
@@ -1024,7 +1200,7 @@ body {
   cursor: pointer;
 }
 
-[data-theme="dark"] .equalizer-presets select {
+[data-mode="dark"] .equalizer-presets select {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -1040,7 +1216,7 @@ body {
   min-height: 300px;
 }
 
-[data-theme="dark"] .equalizer-bands {
+[data-mode="dark"] .equalizer-bands {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -1082,7 +1258,7 @@ body {
   border-radius: 2px;
 }
 
-[data-theme="dark"] .eq-slider::-webkit-slider-runnable-track {
+[data-mode="dark"] .eq-slider::-webkit-slider-runnable-track {
   background: rgba(255, 255, 255, 0.2);
 }
 
@@ -1105,7 +1281,7 @@ body {
   border: none;
 }
 
-[data-theme="dark"] .eq-slider::-moz-range-track {
+[data-mode="dark"] .eq-slider::-moz-range-track {
   background: rgba(255, 255, 255, 0.2);
 }
 
@@ -1177,6 +1353,7 @@ body {
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 16px;
+  flex-shrink: 0;
 }
 
 .settings-nav-btn {
@@ -1208,7 +1385,36 @@ body {
 }
 
 .settings-panel.active {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Последняя секция панели растягивается на свободную высоту —
+   списки внутри неё (планировщик) заполняют окно, а не обрубаются. */
+.settings-panel.active > .settings-section:last-child {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#schedulerControls {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#schedulesList {
+  flex: 1;
+  min-height: 60px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 .eq-slider::-moz-range-thumb {
@@ -1237,7 +1443,7 @@ body {
   border: 1px solid rgba(0, 0, 0, 0.12);
 }
 
-[data-theme="dark"] .equalizer-info {
+[data-mode="dark"] .equalizer-info {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -1248,7 +1454,7 @@ body {
   line-height: 1.5;
 }
 
-[data-theme="dark"] .equalizer-info p {
+[data-mode="dark"] .equalizer-info p {
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -1421,8 +1627,11 @@ body {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-card);
-  max-height: 320px;
+  /* Динамическая высота: растягиваются вместе с окном, а не потолок 320px */
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   min-width: 0;
 }
 

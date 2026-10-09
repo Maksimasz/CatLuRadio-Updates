@@ -40,6 +40,14 @@ const ThemeManager = {
     }
     
     document.documentElement.setAttribute('data-theme', actualTheme);
+    // Общий «режим» (светлый/тёмный) для компонентных правил CSS:
+    // темы разного семейства (dark, spotify, amoled — тёмные; light, apple — светлые)
+    // делят одни и те же правила элементов, различаясь только переменными.
+    const darkThemes = ['dark', 'spotify', 'amoled'];
+    document.documentElement.setAttribute(
+      'data-mode',
+      darkThemes.includes(actualTheme) ? 'dark' : 'light'
+    );
   },
 
   /**
