@@ -35,6 +35,9 @@ function sendToNative(action, data = {}, timeoutMs = null) {
             if (!(id in callbacks)) return;
             delete callbacks[id];
             console.error(`[WebView2 API] Таймаут ${limit} мс, нет ответа на действие "${action}"`);
+            // Таймауты — главный кандидат на «ноль реакции ровно N секунд»;
+            // дублируем в app.log (сам лог не таймаутится — иначе петля).
+            if (action !== 'log') window.AppAPI?.log?.(`таймаут ${limit} мс без ответа: ${action}`);
             resolve(null);
         }, limit);
 
@@ -143,6 +146,8 @@ const WebView2API = {
     seekNative: (ms) => sendToNative('seekNative', { ms }),
     setNativeVolume: (volume) => sendToNative('setNativeVolume', { volume }),
     setNativeEqualizer: (values) => sendToNative('setNativeEqualizer', { values }),
+    // Диагностика в app.log хоста: консоль WebView2 пользователю недоступна.
+    log: (message) => sendToNative('log', { message }, 5000),
     // YouTube: список треков плейлиста при добавлении + аудио-поток трека
     // непосредственно перед запуском (ссылки googlevideo истекают).
     resolveYoutubePlaylist: (url) => sendToNative('resolveYoutubePlaylist', { url }),
@@ -256,6 +261,7 @@ window.AppAPI = {
     seekNative: (ms) => WebView2API.seekNative(ms),
     setNativeVolume: (volume) => WebView2API.setNativeVolume(volume),
     setNativeEqualizer: (values) => WebView2API.setNativeEqualizer(values),
+    log: (message) => WebView2API.log(message),
     resolveYoutubePlaylist: (url) => WebView2API.resolveYoutubePlaylist(url),
     resolveYoutubeTrack: (videoId) => WebView2API.resolveYoutubeTrack(videoId),
     // nativeEnded — push-событие хоста (трек доиграл в LibVLC),

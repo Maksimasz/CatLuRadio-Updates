@@ -22,6 +22,17 @@ for (const marker of ['case "seekNative"', 'TimeChanged', '"nativeTime"', 'OnNat
 if (!main.includes('< 250')) {
   throw new Error('В MainForm.cs нет дросселя отправки позиции (250 мс)');
 }
+// Жалоба 2026-10-09 «громкость ютуба при запуске нормальная, но ползунок
+// возвращает тихий звук»: смена Volume на лету перестраивает цепочку вывода,
+// и эквалайзер (Preamp +6 дБ) слетал — после движения ползунка трек играл
+// тихо. setNative обязан заново навешивать ту же цепочку.
+if (!main.includes('if (nativeEqualizer is not null) nativePlayer.SetEqualizer(nativeEqualizer);')) {
+  throw new Error('setNativeVolume не восстанавливает эквалайзер после смены громкости');
+}
+// Диагностика в app.log: консоль WebView2 пользователю недоступна.
+if (!main.includes('case "log"') || !main.includes('AppLog.Info("[page] "')) {
+  throw new Error('Хост не принимает диагностические логи со страницы');
+}
 
 // ——— Мост (api-adapter) ———
 const adapter = read('wwwroot', 'js', 'api-adapter.js');

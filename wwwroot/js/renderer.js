@@ -219,6 +219,7 @@ async function init() {
   }
 
   console.log('[INIT] Инициализация завершена за', (performance.now() - initStartTime).toFixed(0), 'мс');
+  window.AppAPI.log?.(`init ${Math.round(performance.now() - initStartTime)} мс`);
   checkForUpdates();
 
   // Даём WebView2 завершить инициализацию до старта потока.
@@ -469,6 +470,10 @@ function flushVolumeSave() {
     volumeSaveTimer = null;
   }
   saveVolumeSettings();
+  // Один лог на жест (change, не input): в app.log видно, с каким значением
+  // ползунок реально ушёл в хост — «значение или механизм» при жалобе на тихий
+  // YouTube после движения ползунка.
+  window.AppAPI.log?.(`громкость: ${state.volume}`);
 }
 
 // Автозапуск при старте упирается в политику autoplay Chromium: без жеста
@@ -1125,10 +1130,19 @@ async function playStation(station) {
     return;
   }
 
-  // LibVLC — основной движок: он ждёт начало вывода звука. При неудаче ниже
-  // сохраняется прежний браузерный путь как совместимый резерв.
-  if (!crossfadeEnabled) {
+  // LibVLC — основной движок: он ждёт начало вывода звука. Нативно играем
+  // всегда, пока кроссфейд реально не нужен — он применяется только при
+  // переключении с уже играющего <audio>. Раньше здесь проверялся сам факт
+  // включённости настройки, и при дефолтном кроссфейде ВСЕ станции шли через
+  // браузер: медленный буфер, Web Audio и CORS-рестарты вместо быстрого
+  // старта LibVLC. Неподдержанный VLC-ом поток ниже падает в прежний
+  // браузерный путь как резерв.
+  if (!useCrossfade) {
+    const nativeStartedAt = performance.now();
     const nativeResult = await window.AppAPI.playNative(streamUrl, state.volume);
+    // Тайминг в app.log: консоль WebView2 недоступна, а «долго подключается»
+    // без цифр диагностировать нечем.
+    window.AppAPI.log?.(`станция «${station.name}»: LibVLC ${Math.round(performance.now() - nativeStartedAt)} мс, громкость ${state.volume}${nativeResult?.success ? '' : ' — неудача, браузерный резерв'}`);
     if (nativeResult?.success) {
       state.nativeAudio = true;
       // Эквалайзер — косметика: его сбой не должен ронять запуск станции.
@@ -1199,13 +1213,20 @@ async function playYoutubeTrack(requestedIndex) {
   resetSeekState();
 
   try {
+    const resolveStartedAt = performance.now();
     const resolved = await window.AppAPI.resolveYoutubeTrack(track.id);
+    const resolveMs = Math.round(performance.now() - resolveStartedAt);
     if (!resolved?.success || !resolved.url) {
+      window.AppAPI.log?.(`youtube: резолв ${resolveMs} мс, ошибка: ${resolved?.error || 'нет url'}`);
       await skipYoutubeTrack(track, resolved?.error);
       return;
     }
 
+    const nativeStartedAt = performance.now();
     const nativeResult = await window.AppAPI.playNative(resolved.url, state.volume);
+    // Тайминг в app.log: показывает, где именно теряются секунды между
+    // кликом по YouTube-станции и началом звука.
+    window.AppAPI.log?.(`youtube трек ${track.id}: резолв ${resolveMs} мс, старт VLC ${Math.round(performance.now() - nativeStartedAt)} мс, громкость ${state.volume}${nativeResult?.success ? '' : ' — неудача'}`);
     if (nativeResult?.success) {
       started = true;
       state.nativeAudio = true;

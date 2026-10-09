@@ -298,6 +298,13 @@ namespace CatLuRadio
                         RequestSaveStore();
                         SendCallback(callbackId, new { success = true });
                         break;
+                    case "log":
+                        // Диагностика со страницы: консоль WebView2 пользователю
+                        // недоступна, а тайминги/таймауты воспроизведения нужны в
+                        // app.log для поиска причин «долго подключается».
+                        AppLog.Info("[page] " + (data["message"]?.ToString() ?? ""));
+                        SendCallback(callbackId, new { success = true });
+                        break;
                     case "httpGet":
                         _ = HttpGet(data["url"]?.ToString() ?? "", callbackId);
                         break;
@@ -337,6 +344,13 @@ namespace CatLuRadio
                         break;
                     case "setNativeVolume":
                         nativePlayer.Volume = (int)Math.Round(Math.Clamp(data["volume"]?.Value<double>() ?? 0.5, 0, 1) * 100);
+                        // Смена громкости на лету перестраивает цепочку вывода звука,
+                        // иначе эквалайзер (в нём Preamp +6 дБ — громкость уровня
+                        // YouTube) слетал: трек после любого движения ползунка
+                        // начинал играть тихо, «как до фикса громкости», при
+                        // нормальной громкости на старте. Повторное SetEqualizer
+                        // заново навешивает ту же цепочку — звук возвращается.
+                        if (nativeEqualizer is not null) nativePlayer.SetEqualizer(nativeEqualizer);
                         SendCallback(callbackId, new { success = true });
                         break;
                     case "setNativeEqualizer":

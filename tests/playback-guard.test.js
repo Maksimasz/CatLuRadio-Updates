@@ -24,7 +24,12 @@ if (!source.includes('const processingWanted =')) throw new Error('Обрабо�
 if (!source.includes('state.streamsWithoutWebAudio.add(streamUrl)')) throw new Error('Нет аварийного перезапуска потока без CORS');
 if (source.includes('station && state.stationHealth[station.id] !== false')) throw new Error('Проверка потока блокирует запуск станции');
 if (!source.includes('delete state.stationHealth[station.id];')) throw new Error('Неудачная фоновая проверка помечает станцию недоступной');
-if (!source.includes('if (!crossfadeEnabled)') || !source.includes('const nativeResult = await window.AppAPI.playNative(streamUrl, state.volume);')) throw new Error('LibVLC не запускается первым для обычного переключения');
+// Жалоба 2026-10-09 «станции долго подключаются»: гейт проверял факт
+// включённости настройки кроссфейда, и при дефолтном включённом кроссфейде
+// ВСЕ станции шли через браузер (буфер, Web Audio, CORS-рестарты). Нативный
+// путь включается, пока кроссфейд реально не применяется — он нужен только
+// при переключении с уже играющего <audio>.
+if (!source.includes('if (!useCrossfade)') || !source.includes('const nativeResult = await window.AppAPI.playNative(streamUrl, state.volume);')) throw new Error('LibVLC не запускается первым для обычного переключения');
 if (!source.includes("streamUrl.startsWith('http://') && streamCheck?.success")) throw new Error('Браузерный резерв изменён без проверки HTTP-потока');
 if (!source.includes('state.audio || state.nativeAudio')) throw new Error('Кнопки отключаются при резервном воспроизведении');
 if (!source.includes('setInterval(checkAllStations, 15 * 60 * 1000)')) throw new Error('Нет автоматической проверки станций');
@@ -54,6 +59,17 @@ for (const m of source.matchAll(/await window\.AppAPI\.setNativeEqualizer/g)) {
 // первого трека, а повторный запуск молча ничего не делал.
 if (!source.includes("catch (e) { console.warn('Эквалайзер LibVLC не применился:', e); }")) throw new Error('Сбой эквалайзера фатален для запуска станции');
 if (!adapter.includes('response.success ?? response.Success')) throw new Error('HTTP-ответ C# не приводится к формату поиска');
+// Диагностика «долго подключается» (жалоба 2026-10-09): консоль WebView2
+// пользователю недоступна, поэтому тайминги станции/YouTube и таймауты моста
+// дублируются в app.log хоста через действие log (без петли на сам log).
+if (!adapter.includes("log: (message) => sendToNative('log', { message }, 5000)")
+    || !adapter.includes('log: (message) => WebView2API.log(message)')) {
+    throw new Error('Диагностическое действие log не проведено через мост');
+}
+if (!adapter.includes('if (action !== \'log\') window.AppAPI?.log?.(')) throw new Error('Таймауты моста не дублируются в app.log');
+if (!source.includes('AppAPI.log?.(`станция «')) throw new Error('Тайминг запуска станции не логируется в app.log');
+if (!source.includes('AppAPI.log?.(`youtube трек')) throw new Error('Тайминги YouTube-трека не логируются в app.log');
+if (!source.includes('AppAPI.log?.(`init ')) throw new Error('Длительность инициализации не логируется в app.log');
 if (!adapter.includes("typeof result === 'string' ? JSON.parse(result) : result")) throw new Error('HTTP-ответ-объект повторно разбирается как JSON');
 if (!adapter.includes("success: response?.success ?? response?.Success")) throw new Error('Проверка потока не приводит поле Success из C#');
 if (!adapter.includes("WebView2API.httpGet('https://radiopotok.ru/')")) throw new Error('RadioPotok не подключён к поиску');
