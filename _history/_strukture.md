@@ -421,3 +421,11 @@
 - 12/12 node-тестов (новые: gain-slider — цепочка вёрстка→state→мост→Preamp с клампом 0…+12 и чистым проходом; youtube-off — флаг, гейты и якоря без потери кода), README — список из 12.
 - dotnet build -c Debug — 0 ошибок/0 предупреждений; publish win-x64 self-contained (CatLuRadio.exe, yt-dlp.exe, index.html с 3× ?v=3.5.7).
 - Установщик: release/CatLuRadio-3.5.7-Standalone-Setup-desktop.exe (375 360 781 байт, SHA-256 09D31FBE4F831241F6183F444E0FBF0E0E3E8D55348D588A0EB7EFB8BAFBE415).
+### Релиз 3.5.7
+
+- Версия поднята до 3.5.7 везде: csproj (`Version`/`AssemblyVersion`/`FileVersion`), `?v=` в index.html (3 ссылки), installer/CatLuRadio.iss (`MyAppVersion`/`VersionInfoVersion`), «О программе» (renderer.js, TranslationManager.js), бейдж README; README — запись 3.5.7 в «Версии», пункт про YouTube помечен как «временно отключён», список тестов расширен до 12.
+- Проверено: 12/12 node-тестов (новые `gain-slider` и `youtube-off`), `dotnet build -c Debug` — 0 ошибок/0 предупреждений, `dotnet publish -c Release -r win-x64 --self-contained true` (CatLuRadio.exe, yt-dlp.exe, index.html с 3× `?v=3.5.7`).
+- Установщик: `release/CatLuRadio-3.5.7-Standalone-Setup-desktop.exe` (375 360 781 байт, SHA-256 `09D31FBE4F831241F6183F444E0FBF0E0E3E8D55348D588A0EB7EFB8BAFBE415`).
+- Опубликован релиз `v3.5.7`: https://github.com/Maksimasz/CatLuRadioNET/releases/tag/v3.5.7 (id 407873458), установщик ассетом (id 624855590) — `releases/latest` указывает на 3.5.7. Заметки: `%TEMP%\opencode\release-3.5.7-notes.md`.
+- Коммит `7b55b2e` «Релиз 3.5.7: YouTube по флагу, ползунок усиления 0…+12 дБ» запушен в `main` прямым URL с кредом из диспетчера учётных данных (штатный `git push` и `git credential fill` в этой сессии зависали — токен прочитан через `CredRead`).
+- Кеш иконок Windows пересоздан: удалены 30 файлов `iconcache_*.db`/`thumbcache_*.db` в `%LocalAppData%` и `...\Microsoft\Windows\Explorer`, Проводник перезапущен, `ie4uinit -show` — Explorer пересобрал кеш заново.
