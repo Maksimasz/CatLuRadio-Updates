@@ -1,6 +1,6 @@
 // YouTube-плейлисты: очередь треков поверх LibVLC.
 // Цепочка не должна рассыпаться по одному месту — каждый её кусок ловится здесь:
-// 1) хост умеет резолвить плейлисты и аудио-потоки (YoutubeExplode),
+// 1) хост умеет резолвить плейлисты и аудио-потоки (yt-dlp),
 // 2) хост шлёт событие nativeEnded по естественному концу трека,
 // 3) страница слушает это событие и двигает очередь,
 // 4) у станции-плейлиста свой путь запуска и своя остановка.
@@ -11,16 +11,26 @@ const root = path.join(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
 // ——— Хост (C#) ———
+// Резолвер — yt-dlp.exe (YtDlp.cs): YouTubeExplode убрана 2026-10-09,
+// у неё сплошные 403 на каждый резолв («Не удалось воспроизвести плейлист»,
+// app.log), yt-dlp на том же канале отдаёт и список, и прямую ссылку (~3 с).
 const csproj = read('CatLuRadio.csproj');
-if (!csproj.includes('YoutubeExplode')) {
-  throw new Error('В CatLuRadio.csproj нет пакета YoutubeExplode — хост не сможет резолвить YouTube');
+if (csproj.includes('YoutubeExplode')) {
+  throw new Error('YouTubeExplode вернулась в csproj — резолв должен идти через yt-dlp');
+}
+if (!csproj.includes('yt-dlp.exe')) {
+  throw new Error('В CatLuRadio.csproj не подключён yt-dlp.exe — хост не сможет резолвить YouTube');
+}
+const ytdlp = read('YtDlp.cs');
+for (const marker of ['RunAsync', 'EnsureAsync', 'CreateNoWindow = true']) {
+  if (!ytdlp.includes(marker)) throw new Error(`В YtDlp.cs нет "${marker}"`);
 }
 
 const main = read('MainForm.cs');
-for (const marker of ['case "resolveYoutubePlaylist"', 'case "resolveYoutubeTrack"', 'EndReached', 'nativeEnded']) {
+for (const marker of ['case "resolveYoutubePlaylist"', 'case "resolveYoutubeTrack"', 'EndReached', 'nativeEnded', 'YtDlp.RunAsync']) {
   if (!main.includes(marker)) throw new Error(`В MainForm.cs нет "${marker}"`);
 }
-if (!main.includes('GetAudioOnlyStreams')) {
+if (!main.includes('"bestaudio/best"')) {
   throw new Error('ResolveYoutubeTrack не выбирает аудио-поток — очередь не сможет запустить трек');
 }
 
@@ -87,6 +97,11 @@ if (!renderer.includes('const isYoutubeStation = station =>') ||
 const program = read('Program.cs');
 for (const marker of ['SingleInstanceName', 'isFirstInstance', 'FocusExistingInstance', 'GC.KeepAlive(singleInstanceMutex)']) {
   if (!program.includes(marker)) throw new Error(`В Program.cs нет "${marker}" — защита от двух экземпляров не работает`);
+}
+// SLAVA_UKRAINI обходил региональную блокировку Deorcify из YouTubeExplode —
+// вместе с пакетом ушла и переменная (иначе в коде мёртвый обход).
+if (program.includes('SLAVA_UKRAINI')) {
+  throw new Error('SLAVA_UKRAINI остался в Program.cs — обход Deorcify нужен был только YouTubeExplode');
 }
 
 // ——— Разметка и переводы ———

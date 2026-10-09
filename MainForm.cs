@@ -13,8 +13,6 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using YoutubeExplode;
-using YoutubeExplode.Videos.Streams;
 
 namespace CatLuRadio
 {
@@ -51,9 +49,6 @@ namespace CatLuRadio
         private long nativeTimeTick;
         private long lastSentTime = long.MinValue;
         private long lastSentLength = long.MinValue;
-        // Резолвер YouTube (NuGet YoutubeExplode): списки плейлистов и прямые
-        // аудио-потоки для очереди YouTube-плейлистов.
-        private readonly YoutubeClient ytClient = new();
         private const string UpdatesApiUrl = "https://api.github.com/repos/Maksimasz/CatLuRadioNET/releases/latest";
         private const string UpdateAssetPrefix = "https://github.com/Maksimasz/CatLuRadioNET/releases/download/";
 
@@ -80,10 +75,11 @@ namespace CatLuRadio
             Core.Initialize(Path.Combine(AppContext.BaseDirectory, "libvlc", "win-x64"));
             // Фильтры audio-filter на уровне экземпляра LibVLC здесь НЕ работают:
             // SetEqualizer при каждом старте трека перезаписывает переменную
-            // "audio-filter" на "equalizer", выкидывая из цепочки и gain, и
-            // normvol (проверено: --audio-filter=gain --gain-value=2.0 не менял
-            // громкость). Усиление делаем Preamp'ом внутри Equalizer — см.
-            // SetNativeEqualizer.
+            // "audio-filter" на "equalizer", выкидывая из цепочки чужие фильтры
+            // (проверено: --audio-filter=gain --gain-value=2.0 не менял
+            // громкость). Поэтому усиление через gain не делаем вовсе: громкость —
+            // только nativePlayer.Volume, эквалайзер — по желанию (см.
+            // SetNativeEqualizer).
             nativeVlc = new LibVLC("--no-video", "--network-caching=1000");
             nativePlayer = new MediaPlayer(nativeVlc);
             nativePlayer.Playing += (_, _) => nativeStart?.TrySetResult(true);
@@ -344,12 +340,12 @@ namespace CatLuRadio
                         break;
                     case "setNativeVolume":
                         nativePlayer.Volume = (int)Math.Round(Math.Clamp(data["volume"]?.Value<double>() ?? 0.5, 0, 1) * 100);
-                        // Смена громкости на лету перестраивает цепочку вывода звука,
-                        // иначе эквалайзер (в нём Preamp +6 дБ — громкость уровня
-                        // YouTube) слетал: трек после любого движения ползунка
-                        // начинал играть тихо, «как до фикса громкости», при
-                        // нормальной громкости на старте. Повторное SetEqualizer
-                        // заново навешивает ту же цепочку — звук возвращается.
+                        // Смена громкости на лету перестраивает цепочку вывода
+                        // звука и слетающие на ней полосы: без повторного
+                        // SetEqualizer эквалайзер замолкал до следующего старта.
+                        // Повторно навешиваем только реально включённый фильтр —
+                        // снятый (null) не трогаем. Громкости это не касается:
+                        // Preamp больше не используется, её даёт один Volume.
                         if (nativeEqualizer is not null) nativePlayer.SetEqualizer(nativeEqualizer);
                         SendCallback(callbackId, new { success = true });
                         break;
@@ -602,6 +598,10 @@ namespace CatLuRadio
         // Список треков YouTube-плейлиста (или одиночного видео) для добавления
         // в станции. Запрашивается один раз при импорте: сами ссылки на аудио
         // здесь не нужны — они истекают и резолвятся перед каждым треком.
+        // Резолвит yt-dlp (см. YtDlp.cs): один вызов --flat-playlist -j отдаёт
+        // и треки, и заголовок с автором плейлиста (playlist_title /
+        // playlist_uploader), и обложку первого видео — проверено на живом
+        // плейлисте пользователя 2026-10-09: 128 записей за 2.6 с.
         private async Task ResolveYoutubePlaylist(string url, string callbackId) {
             try {
                 var (playlistId, videoId) = ParseYoutubeUrl(url);
@@ -614,21 +614,47 @@ namespace CatLuRadio
                 var tracks = new JArray();
 
                 if (playlistId is not null) {
-                    var playlist = await ytClient.Playlists.GetAsync(playlistId);
-                    title = playlist.Title;
-                    author = playlist.Author?.ChannelTitle ?? "";
-                    await foreach (var video in ytClient.Playlists.GetVideosAsync(playlistId)) {
+                    // Таймаут ниже мостового (resolveYoutubePlaylist: 60 с) —
+                    // иначе мост ответит первым null, а хост продолжит работать.
+                    var (stdout, error) = await YtDlp.RunAsync(new[] {
+                        "--flat-playlist", "--no-warnings", "-j",
+                        $"https://www.youtube.com/playlist?list={playlistId}"
+                    }, 55_000);
+                    if (error is not null) {
+                        SendCallback(callbackId, new { success = false, error });
+                        return;
+                    }
+                    foreach (var line in SplitLines(stdout)) {
                         if (tracks.Count >= 200) break;
-                        tracks.Add(TrackJson(video.Id.Value, video.Title, video.Author?.ChannelTitle, video.Duration));
-                        if (thumbnail.Length == 0 && video.Thumbnails.Count > 0)
-                            thumbnail = video.Thumbnails[^1].Url;
+                        JObject entry;
+                        try { entry = JObject.Parse(line); }
+                        catch { continue; } // служебная строка не должна ронять весь импорт
+                        tracks.Add(TrackJson(entry));
+                        if (thumbnail.Length == 0) thumbnail = ThumbUrl(entry);
+                        if (title.Length == 0) {
+                            title = entry["playlist_title"]?.ToString() ?? "";
+                            author = entry["playlist_uploader"]?.ToString() ?? entry["playlist_channel"]?.ToString() ?? "";
+                        }
                     }
                 } else {
-                    var video = await ytClient.Videos.GetAsync(videoId!);
-                    title = video.Title;
-                    author = video.Author?.ChannelTitle ?? "";
-                    if (video.Thumbnails.Count > 0) thumbnail = video.Thumbnails[^1].Url;
-                    tracks.Add(TrackJson(video.Id.Value, video.Title, video.Author?.ChannelTitle, video.Duration));
+                    var (stdout, error) = await YtDlp.RunAsync(new[] {
+                        "--no-playlist", "--no-warnings", "-j",
+                        $"https://www.youtube.com/watch?v={videoId}"
+                    }, 45_000);
+                    if (error is not null) {
+                        SendCallback(callbackId, new { success = false, error });
+                        return;
+                    }
+                    var line = SplitLines(stdout).FirstOrDefault();
+                    if (line is null) {
+                        SendCallback(callbackId, new { success = false, error = "yt-dlp не вернул описание видео" });
+                        return;
+                    }
+                    var entry = JObject.Parse(line);
+                    title = entry["title"]?.ToString() ?? "";
+                    author = entry["channel"]?.ToString() ?? entry["uploader"]?.ToString() ?? "";
+                    thumbnail = ThumbUrl(entry);
+                    tracks.Add(TrackJson(entry));
                 }
 
                 if (tracks.Count == 0) {
@@ -642,30 +668,59 @@ namespace CatLuRadio
         // Прямая ссылка на аудио одного трека. Вызывается непосредственно перед
         // запуском: googlevideo URL живёт несколько часов и привязан к IP,
         // поэтому кешировать его бессмысленно.
+        // yt-dlp вместо YouTubeExplode: у последней с 2026-10-09 каждый резолв
+        // отвечал 403 Forbidden («Не удалось воспроизвести плейлист» — см.
+        // app.log), yt-dlp отдаёт ссылку за ~3 с (замер: itag 251,
+        // audio/webm, HTTP 206 — LibVLC такой поток играет).
         private async Task ResolveYoutubeTrack(string videoId, string callbackId) {
             if (string.IsNullOrWhiteSpace(videoId)) {
                 SendCallback(callbackId, new { success = false, error = "Пустой идентификатор видео" });
                 return;
             }
-            try {
-                var manifest = await ytClient.Videos.Streams.GetManifestAsync(videoId);
-                var audio = manifest.GetAudioOnlyStreams().GetWithHighestBitrate();
-                if (audio is null) {
-                    SendCallback(callbackId, new { success = false, error = "Аудио-поток не найден" });
-                    return;
-                }
-                SendCallback(callbackId, new { success = true, url = audio.Url, container = audio.Container.Name });
-            } catch (Exception ex) { SendCallback(callbackId, new { success = false, error = ex.Message }); }
+            // Таймаут ниже мостового (resolveYoutubeTrack: 30 с): мост при
+            // превышении резолвит null и очередь уходит на пропуск трека,
+            // а хост не должен работать вхолостую после ответа.
+            var (stdout, error) = await YtDlp.RunAsync(new[] {
+                "--no-playlist", "--no-warnings",
+                "-f", "bestaudio/best", "-g",
+                $"https://www.youtube.com/watch?v={videoId}"
+            }, 25_000);
+            if (error is not null) {
+                SendCallback(callbackId, new { success = false, error });
+                return;
+            }
+            var streamUrl = SplitLines(stdout).FirstOrDefault();
+            if (streamUrl is null || !(streamUrl.StartsWith("http://") || streamUrl.StartsWith("https://"))) {
+                SendCallback(callbackId, new { success = false, error = "Прямая ссылка на аудио не получена" });
+                return;
+            }
+            SendCallback(callbackId, new { success = true, url = streamUrl });
         }
 
-        private static JObject TrackJson(string id, string title, string? channelTitle, TimeSpan? duration) {
+        // Одна запись трека в том виде, в каком её ждёт страница
+        // (см. addYoutubePlaylist в renderer.js).
+        private static JObject TrackJson(JObject entry) {
+            double seconds = 0;
+            try { seconds = entry["duration"]?.Value<double?>() ?? 0; }
+            catch { /* у неполных записей duration бывает не числом */ }
             return new JObject {
-                ["id"] = id,
-                ["title"] = title,
-                ["author"] = channelTitle ?? "",
-                ["duration"] = (int)(duration ?? TimeSpan.Zero).TotalSeconds
+                ["id"] = entry["id"]?.ToString() ?? "",
+                ["title"] = entry["title"]?.ToString() ?? "",
+                ["author"] = entry["channel"]?.ToString() ?? entry["uploader"]?.ToString() ?? "",
+                ["duration"] = (int)seconds
             };
         }
+
+        // Обложка: массив thumbnails, берём последний элемент — самый крупный
+        // (maxresdefault), как и делал старый резолвер.
+        private static string ThumbUrl(JObject entry) {
+            var thumbnails = entry["thumbnails"] as JArray;
+            var last = thumbnails is { Count: > 0 } ? thumbnails[thumbnails.Count - 1] as JObject : null;
+            return last?["url"]?.ToString() ?? "";
+        }
+
+        private static IEnumerable<string> SplitLines(string? text) =>
+            (text ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         // Понимает основные формы ссылок: playlist?list=..., watch?v=...&list=...,
         // youtu.be/ID, shorts/ID, live/ID. Плейлист важнее одиночного видео:
@@ -694,23 +749,20 @@ namespace CatLuRadio
             return null;
         }
 
-        // Общее усиление воспроизведения YouTube в дБ. Ютубовская нормализация
-        // поднимает тихие ролики примерно на +6 дБ: без этого ролик, который на
-        // YouTube на 50% слайдера даёт привычную громкость, требовал бы в
-        // нашем плеере 100%. Preamp эквалайзера — «global gain in dB (-20..20)»
-        // и живёт внутри фильтра equalizer, поэтому SetEqualizer его не выкинет.
-        private const float NativeGainDb = 6f;
-
+        // Эквалайзер LibVLC: values = null снимает фильтр совсем (чистый
+        // проход — YouTube и выключенный чекбокс), иначе навешиваем полосы.
+        //
+        // Отсюда же убрано общее усиление Preamp +6 дБ: оно применялось к
+        // любому источнику, т.е. и к «горячим» радиопотокам, где давало
+        // перегрузку — «звук как из бочки», искажённая громкость и нелинейный
+        // ползунок (0…100% шёл усилением ×2) — жалоба 2026-10-09. Громкость
+        // теперь исключительно nativePlayer.Volume.
         private void SetNativeEqualizer(JArray? values, string callbackId) {
             nativeEqualizer?.Dispose();
             nativeEqualizer = null;
-            // Применяем эквалайзер ВСЕГДА (даже когда он выключен): раньше
-            // ветка UnsetEqualizer гасила и общий gain, из-за чего громкость
-            // прыгала в зависимости от состояния эквалайзера. Пустой эквалайзер
-            // — ровные полосы + Preamp, т.е. звук тот же, громкость та же.
-            nativeEqualizer = new Equalizer();
-            nativeEqualizer.SetPreamp(NativeGainDb);
+            bool success = true;
             if (values is not null) {
+                nativeEqualizer = new Equalizer();
                 for (uint index = 0; index < nativeEqualizer.BandCount && index < values.Count; index++) {
                     // Индексатор JArray принимает только int/string: uint давал
                     // ArgumentException ("Int32 array index expected") до SendCallback —
@@ -719,9 +771,14 @@ namespace CatLuRadio
                     // которое guard isSwitching молча отбрасывал.
                     nativeEqualizer.SetAmp(Math.Clamp(values[(int)index]?.Value<float>() ?? 0, -12, 12), index);
                 }
+                success = nativePlayer.SetEqualizer(nativeEqualizer);
+                if (!success) { nativeEqualizer.Dispose(); nativeEqualizer = null; }
+            } else {
+                // Снятие фильтра — отдельный метод LibVLCSharp (libvlc
+                // unset_equalizer): цепочка вывода звука становится чистой,
+                // никаких полос и без Preamp.
+                nativePlayer.UnsetEqualizer();
             }
-            var success = nativePlayer.SetEqualizer(nativeEqualizer);
-            if (!success) { nativeEqualizer.Dispose(); nativeEqualizer = null; }
             SendCallback(callbackId, new { success });
         }
         private void ShowSaveDialog(string defaultPath, string callbackId) {

@@ -62,9 +62,12 @@ assert.match(css, /\.online-results \{[\s\S]{0,400}flex: 1;/,
   'Результаты онлайн-поиска не растягиваются вместе с окном');
 assert.ok(!/max-height: 320px/.test(css),
   'У результатов поиска снова потолок 320px — «обрубок» при растяжении окна');
-assert.match(css, /#schedulesList \{\s*flex: 1;/,
-  'Список планировщика не растягивается вместе с окном');
-assert.match(css, /\.settings-panel\.active \{\s*display: flex;[\s\S]{0,200}overflow-y: auto;/,
+// Жалоба 2026-10-09 «в планировщике видно только одно [из пяти]»: вложенная
+// прокрутка #schedulesList (flex: 1 + overflow) отдавала списку ~60px высоты.
+// Карточки текут естественно, прокручивается вся панель.
+assert.ok(!/#schedulesList \{[^}]*overflow-y: auto/.test(css),
+  'Список планировщика снова вложенно прокручивается — видна одна карточка из пяти');
+assert.match(css, /\.settings-panel\.active \{\s*display: block;[\s\S]{0,200}overflow-y: auto;/,
   'Панель настроек не прокручивается внутри высоты окна');
 assert.match(renderer, /function syncWindowMinWidth\(\)/,
   'Нет функции адаптации минимальной ширины окна');

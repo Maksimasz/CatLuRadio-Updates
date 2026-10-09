@@ -1384,36 +1384,29 @@ body.settings-open .tab-btn-icon .close-icon {
   display: none;
 }
 
+/* Активная панель занимает остаток высоты формы и прокручивается целиком:
+   навигация закреплена над ней, содержимое (включая карточки расписаний)
+   течёт естественно — при растяжении окна вниз панель растёт, видно больше
+   строк, и нет обрезанных вложенных областей прокрутки. */
 .settings-panel.active {
-  display: flex;
-  flex-direction: column;
+  display: block;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-/* Последняя секция панели растягивается на свободную высоту —
-   списки внутри неё (планировщик) заполняют окно, а не обрубаются. */
-.settings-panel.active > .settings-section:last-child {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
+/* Планировщик: карточки расписаний и кнопка добавления идут потоком
+   (кнопка — под последней карточкой), прокрутка — у самой панели.
+   Прежняя вложенная прокрутка (#schedulesList c flex: 1 + overflow)
+   отдавала списку ~60px высоты — из пяти расписаний было видно ровно
+   одно (жалоба 2026-10-09 «в планировщике видно только одно»). */
 #schedulerControls {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
 #schedulesList {
-  flex: 1;
-  min-height: 60px;
-  overflow-y: auto;
-  overflow-x: hidden;
   min-width: 0;
 }
 

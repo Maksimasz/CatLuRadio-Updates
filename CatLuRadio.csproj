@@ -37,7 +37,6 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="LibVLCSharp" Version="3.10.1" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.24" />
-    <PackageReference Include="YoutubeExplode" Version="6.6.2" />
   </ItemGroup>
 
   <!-- Пакет WebView2 безусловно подключает и свою WPF-сборку
@@ -58,6 +57,14 @@
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
     <Content Include="WebView2Runtime\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <!-- yt-dlp.exe — резолвер YouTube (см. YtDlp.cs, замена YouTubeExplode).
+         Файла может не быть (он не в git, см. .gitignore) — тогда условие не
+         срабатывает, сборка проходит, а приложение ищет yt-dlp в PATH или
+         скачивает сам при первом обращении к YouTube. -->
+    <Content Include="yt-dlp.exe" Condition="Exists('yt-dlp.exe')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

@@ -1149,7 +1149,7 @@ async function playStation(station) {
       state.nativeAudio = true;
       // Эквалайзер — косметика: его сбой не должен ронять запуск станции.
       try {
-        await window.AppAPI.setNativeEqualizer(state.settings.equalizer?.values || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        await window.AppAPI.setNativeEqualizer(nativeEqualizerValues());
       } catch (e) { console.warn('Эквалайзер LibVLC не применился:', e); }
       state.isPlaying = true;
       rememberLastStation(station);
@@ -1232,12 +1232,14 @@ async function playYoutubeTrack(requestedIndex) {
     if (nativeResult?.success) {
       started = true;
       state.nativeAudio = true;
-      // Эквалайзер — косметика поверх звука: его сбой (нет функции, таймаут
-      // хоста) не должен ронять очередь. Раньше TypeError здесь останавливал
-      // функцию до сброса isSwitching — очередь умирала после первого трека,
-      // а повторный запуск молча не работал.
+      // YouTube — всегда без эквалайзера (просьба 2026-10-09 «отключи
+      // эквалайзер от ютуба»): null снимает фильтр с LibVLC целиком, включая
+      // унаследованный от радиового запуска — нативный плеер один на все
+      // источники. Сбой моста не должен ронять очередь: TypeError здесь
+      // раньше останавливал функцию до сброса isSwitching — очередь умирала
+      // после первого трека, а повторный запуск молча не работал.
       try {
-        await window.AppAPI.setNativeEqualizer(state.settings.equalizer?.values || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        await window.AppAPI.setNativeEqualizer(null);
       } catch (e) { console.warn('Эквалайзер LibVLC не применился:', e); }
       state.isPlaying = true;
       queue.misses = 0;
@@ -3147,7 +3149,7 @@ function initEqualizer() {
         if (state.audio && state.equalizer.isEnabled) {
           state.equalizer.setBandValue(index, value);
         }
-        if (state.nativeAudio) window.AppAPI.setNativeEqualizer(state.settings.equalizer.values);
+        if (state.nativeAudio) window.AppAPI.setNativeEqualizer(nativeEqualizerValues());
         
         saveData();
       }
@@ -3217,7 +3219,7 @@ function initEqualizer() {
         if (state.audio && state.equalizer.isEnabled) {
           state.equalizer.setValues(values);
         }
-        if (state.nativeAudio) window.AppAPI.setNativeEqualizer(values);
+        if (state.nativeAudio) window.AppAPI.setNativeEqualizer(nativeEqualizerValues());
         
         saveData();
       }
@@ -3259,7 +3261,7 @@ function initEqualizer() {
         if (state.audio && state.equalizer.isEnabled) {
           state.equalizer.setValues([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
         }
-        if (state.nativeAudio) window.AppAPI.setNativeEqualizer(state.settings.equalizer.values);
+        if (state.nativeAudio) window.AppAPI.setNativeEqualizer(nativeEqualizerValues());
         
         saveData();
       }
@@ -3291,6 +3293,19 @@ function initEqualizer() {
   }
 }
 
+// Значения для нативного эквалайзера LibVLC: null — снять фильтр совсем
+// (чистый проход). Фильтр навешиваем только когда он включён чекбоксом,
+// очередь не YouTube и полосы не плоские. Раньше полосы применялись ВСЕГДА,
+// минуя чекбокс («выключил эквалайзер, а он работает»), а Preamp +6 дБ шёл
+// поверх «горячих» потоков — перегрузка, «звук как из бочки» (жалоба
+// 2026-10-09). Громкостью этот фильтр больше не занимается: даёт только
+// nativePlayer.Volume.
+function nativeEqualizerValues() {
+  const eq = state.settings.equalizer;
+  if (state.ytQueue || !eq?.enabled || !Array.isArray(eq.values) || !eq.values.some(v => v)) return null;
+  return eq.values;
+}
+
 // Применить изменение вкл/выкл обработки звука на лету: если элемент уже в графе —
 // просто переключаем блоки; если обработку включили на потоке, идущем в обход
 // Web Audio — перезапускаем текущую станцию уже с обработкой
@@ -3298,6 +3313,15 @@ function applyAudioProcessingChange() {
   const eqWanted = !!(state.settings.equalizer && state.settings.equalizer.enabled && window.Equalizer);
   const normWanted = !!(state.settings.normalization && state.settings.normalization.enabled !== false && window.Equalizer);
   const wanted = eqWanted || normWanted;
+
+  // Нативный плеер (LibVLC): чекбокс обязан действовать сразу. Раньше ниже
+  // обрабатывался только state.audio (браузер), и выключенный эквалайзер
+  // продолжал звучать до следующего переключения станции. YouTube всегда
+  // без фильтра — nativeEqualizerValues() вернёт null.
+  if (state.nativeAudio) {
+    window.AppAPI.setNativeEqualizer(nativeEqualizerValues());
+    return;
+  }
 
   if (!state.audio) return;
 
