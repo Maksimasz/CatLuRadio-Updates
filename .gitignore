@@ -15,6 +15,9 @@ WebView2Runtime/
 # github.com/yt-dlp/yt-dlp лежит локально в корне, в сборку копируется
 # через CopyToOutputDirectory, в git не попадает.
 /yt-dlp.exe
+# CatLuRadioNet.ico — черновая иконка, нигде не используется
+# (ApplicationIcon и установщик работают с icon.ico), лежит только локально.
+/CatLuRadioNet.ico
 
 # --- Среда разработки ---
 .vs/
