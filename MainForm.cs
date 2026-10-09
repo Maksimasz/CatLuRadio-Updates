@@ -43,6 +43,10 @@ namespace CatLuRadio
         private readonly MediaPlayer nativePlayer;
         private Media? nativeMedia;
         private Equalizer? nativeEqualizer;
+        // Последние значения полос с страницы (null — полос нет) и усиление
+        // вывода в дБ (0…+12): вместе собирают цепочку ApplyEqualizerFilter().
+        private JArray? nativeEqValues;
+        private double nativeGainDb = 6;
         private TaskCompletionSource<bool>? nativeStart;
         // Дроссель событий позиции (nativeTime): TimeChanged сыплет десятки
         // событий в секунду — на UI-поток уходит не чаще раза в 250 мс.
@@ -77,9 +81,9 @@ namespace CatLuRadio
             // SetEqualizer при каждом старте трека перезаписывает переменную
             // "audio-filter" на "equalizer", выкидывая из цепочки чужие фильтры
             // (проверено: --audio-filter=gain --gain-value=2.0 не менял
-            // громкость). Поэтому усиление через gain не делаем вовсе: громкость —
-            // только nativePlayer.Volume, эквалайзер — по желанию (см.
-            // SetNativeEqualizer).
+            // громкость). Поэтому усиление — только через Preamp самого
+            // эквалайзера, ползунок 0…+12 дБ в настройках (см.
+            // ApplyEqualizerFilter), громкость — nativePlayer.Volume.
             nativeVlc = new LibVLC("--no-video", "--network-caching=1000");
             nativePlayer = new MediaPlayer(nativeVlc);
             nativePlayer.Playing += (_, _) => nativeStart?.TrySetResult(true);
@@ -345,12 +349,15 @@ namespace CatLuRadio
                         // SetEqualizer эквалайзер замолкал до следующего старта.
                         // Повторно навешиваем только реально включённый фильтр —
                         // снятый (null) не трогаем. Громкости это не касается:
-                        // Preamp больше не используется, её даёт один Volume.
+                        // её даёт один Volume, Preamp — отдельная настройка.
                         if (nativeEqualizer is not null) nativePlayer.SetEqualizer(nativeEqualizer);
                         SendCallback(callbackId, new { success = true });
                         break;
                     case "setNativeEqualizer":
                         SetNativeEqualizer(data["values"] as JArray, callbackId);
+                        break;
+                    case "setNativeGain":
+                        SetNativeGain(data["db"]?.Value<double>() ?? 6, callbackId);
                         break;
                     case "showSaveDialog":
                         ShowSaveDialog(data["defaultPath"]?.ToString() ?? "file.json", callbackId);
@@ -749,37 +756,61 @@ namespace CatLuRadio
             return null;
         }
 
-        // Эквалайзер LibVLC: values = null снимает фильтр совсем (чистый
-        // проход — YouTube и выключенный чекбокс), иначе навешиваем полосы.
+        // Эквалайзер LibVLC: values = null снимает полосы (чистый проход —
+        // выключенный чекбокс, YouTube), иначе навешиваем полосы.
         //
-        // Отсюда же убрано общее усиление Preamp +6 дБ: оно применялось к
-        // любому источнику, т.е. и к «горячим» радиопотокам, где давало
-        // перегрузку — «звук как из бочки», искажённая громкость и нелинейный
-        // ползунок (0…100% шёл усилением ×2) — жалоба 2026-10-09. Громкость
-        // теперь исключительно nativePlayer.Volume.
+        // Усиление (Preamp) живёт отдельно от полос: раньше +6 дБ вшивались
+        // в каждый экземпляр и применялись к любому источнику, т.е. и к
+        // «горячим» радиопотокам, где давали перегрузку — «звук как из
+        // бочки», искажённая громкость и нелинейный ползунок (0…100% шёл
+        // усилением ×2) — жалоба 2026-10-09. Теперь это ползунок 0…+12 дБ
+        // в настройках (по умолчанию +6): громкость даёт только
+        // nativePlayer.Volume, усиление — только осознанный выбор юзера.
         private void SetNativeEqualizer(JArray? values, string callbackId) {
+            nativeEqValues = values;
+            bool success = ApplyEqualizerFilter();
+            SendCallback(callbackId, new { success });
+        }
+
+        // Ползунок усиления (дБ): применяется сразу к уже играющему потоку —
+        // Preamp пересобирается тем же ApplyEqualizerFilter().
+        private void SetNativeGain(double db, string callbackId) {
+            nativeGainDb = Math.Clamp(db, 0, 12);
+            bool success = ApplyEqualizerFilter();
+            SendCallback(callbackId, new { success });
+        }
+
+        // Общая сборка цепочки вывода LibVLC: полосы (если включены) + Preamp.
+        // Усиление действует и при выключенном эквалайзере — тогда полосы
+        // плоские («пустой» Equalizer), а при нуле усиления и без полос фильтр
+        // снимается совсем (чистый проход как в 3.5.6).
+        private bool ApplyEqualizerFilter() {
             nativeEqualizer?.Dispose();
             nativeEqualizer = null;
-            bool success = true;
-            if (values is not null) {
-                nativeEqualizer = new Equalizer();
-                for (uint index = 0; index < nativeEqualizer.BandCount && index < values.Count; index++) {
+            bool haveBands = nativeEqValues is not null && nativeEqValues.Count > 0;
+            if (!haveBands && nativeGainDb <= 0) {
+                // Снятие фильтра — отдельный метод LibVLCSharp (libvlc
+                // unset_equalizer): цепочка вывода звука становится чистой,
+                // никаких полос и без Preamp.
+                nativePlayer.UnsetEqualizer();
+                return true;
+            }
+            nativeEqualizer = new Equalizer();
+            if (haveBands) {
+                for (uint index = 0; index < nativeEqualizer.BandCount && index < nativeEqValues!.Count; index++) {
                     // Индексатор JArray принимает только int/string: uint давал
                     // ArgumentException ("Int32 array index expected") до SendCallback —
                     // страница висела 20 секунд на каждый запуск трека, и за это
                     // время у коротких треков успевало сработать nativeEnded,
                     // которое guard isSwitching молча отбрасывал.
-                    nativeEqualizer.SetAmp(Math.Clamp(values[(int)index]?.Value<float>() ?? 0, -12, 12), index);
+                    nativeEqualizer.SetAmp(Math.Clamp(nativeEqValues[(int)index]?.Value<float>() ?? 0, -12, 12), index);
                 }
-                success = nativePlayer.SetEqualizer(nativeEqualizer);
-                if (!success) { nativeEqualizer.Dispose(); nativeEqualizer = null; }
-            } else {
-                // Снятие фильтра — отдельный метод LibVLCSharp (libvlc
-                // unset_equalizer): цепочка вывода звука становится чистой,
-                // никаких полос и без Preamp.
-                nativePlayer.UnsetEqualizer();
             }
-            SendCallback(callbackId, new { success });
+            // Preamp — дБ, LibVLC сам клампит в ±20; наш ползунок 0…+12.
+            nativeEqualizer.SetPreamp((float)nativeGainDb);
+            bool success = nativePlayer.SetEqualizer(nativeEqualizer);
+            if (!success) { nativeEqualizer.Dispose(); nativeEqualizer = null; }
+            return success;
         }
         private void ShowSaveDialog(string defaultPath, string callbackId) {
             using var dialog = new SaveFileDialog { FileName = Path.GetFileName(defaultPath), Filter = "JSON files|*.json|All files|*.*", Title = "Save file" };

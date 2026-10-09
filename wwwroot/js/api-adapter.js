@@ -139,6 +139,9 @@ const WebView2API = {
         return { success: response?.success ?? response?.Success, status: response?.status ?? response?.Status, error: response?.error ?? response?.Error };
     },
     playNative: (url, volume) => sendToNative('playNative', { url, volume }),
+    // Усиление нативного вывода, дБ (0…+12): отдельное действие от
+    // setNativeEqualizer — полосы и Preamp живут независимо друг от друга.
+    setNativeGain: (db) => sendToNative('setNativeGain', { db }),
     pauseNative: () => sendToNative('pauseNative'),
     resumeNative: () => sendToNative('resumeNative'),
     stopNative: () => sendToNative('stopNative'),
@@ -261,6 +264,7 @@ window.AppAPI = {
     seekNative: (ms) => WebView2API.seekNative(ms),
     setNativeVolume: (volume) => WebView2API.setNativeVolume(volume),
     setNativeEqualizer: (values) => WebView2API.setNativeEqualizer(values),
+    setNativeGain: (db) => WebView2API.setNativeGain(db),
     log: (message) => WebView2API.log(message),
     resolveYoutubePlaylist: (url) => WebView2API.resolveYoutubePlaylist(url),
     resolveYoutubeTrack: (videoId) => WebView2API.resolveYoutubeTrack(videoId),

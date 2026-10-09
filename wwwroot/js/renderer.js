@@ -44,6 +44,7 @@ let state = {
     normalization: {
       enabled: true // Выравнивание громкости станций (компрессор)
     },
+    gainDb: 6, // Усиление вывода LibVLC, дБ (0…+12, по умолчанию +6)
     sleepTimer: {
       enabled: false,
       duration: 60 // Длительность в минутах
@@ -63,6 +64,16 @@ state.stationHealth = {};
 state.isRecoveringStream = false;
 // Потоки, которые не играют с Web Audio (сервер без CORS) — играют без обработки
 state.streamsWithoutWebAudio = new Set();
+
+// YouTube временно отключён в этом релизе: репозиторий открытый, а там yt-dlp
+// не работает (WinError 448). Код YouTube-очереди полностью сохранён — когда
+// разберёмся с причиной, достаточно выставить флаг true: секция в настройках,
+// группа в списке, добавление плейлистов и запуск вернутся без новых правок.
+const YOUTUBE_ENABLED = false;
+
+// Станция-плейлист YouTube: свой путь запуска (очередь) и свои метки в списках.
+const isYoutubeStation = station =>
+  station?.type === 'youtube-playlist' || (typeof station?.id === 'string' && station.id.startsWith('yt-'));
 
 function rememberLastStation(station) {
   if (!station || station.preview) return;
@@ -257,6 +268,11 @@ async function loadData() {
           ...state.settings.normalization,
           ...(savedSettings.normalization || {})
         },
+        // Усиление вывода: сохранённое значение, иначе дефолт из state
+        // (NaN/строка из старых сторов не должны ломать ползунок)
+        gainDb: Number.isFinite(Number(savedSettings.gainDb))
+          ? Number(savedSettings.gainDb)
+          : state.settings.gainDb,
         sleepTimer: {
           ...state.settings.sleepTimer,
           ...(savedSettings.sleepTimer || {})
@@ -466,6 +482,17 @@ function scheduleVolumeSave() {
     saveVolumeSettings();
   }, 400);
 }
+
+// Отложенное сохранение усиления: тот же приём, что у громкости, — один
+// JSON стора через 400 мс тишины после последнего движения ползунка.
+let gainSaveTimer = null;
+function scheduleGainSave() {
+  if (gainSaveTimer) clearTimeout(gainSaveTimer);
+  gainSaveTimer = setTimeout(() => {
+    gainSaveTimer = null;
+    saveData().catch(err => logError('Не удалось сохранить усиление:', err));
+  }, 400);
+}
 function flushVolumeSave() {
   if (volumeSaveTimer) {
     clearTimeout(volumeSaveTimer);
@@ -510,6 +537,12 @@ async function autoPlayLastStation() {
 
     if (lastStationId) {
       const lastStation = state.stations.find(s => s.id === lastStationId);
+      // YouTube отключён: последняя станция-плейлист не запускается молча —
+      // тост о старте был бы непонятен, пользователь просто запустит радио сам.
+      if (lastStation && !YOUTUBE_ENABLED && isYoutubeStation(lastStation)) {
+        console.log('Автозапуск пропущен: YouTube временно отключён');
+        return;
+      }
       if (lastStation) {
         console.log('Автозапуск:', lastStation.name);
         setTimeout(() => {
@@ -579,7 +612,18 @@ function renderHistory() {
   
   if (emptyMsg) emptyMsg.style.display = 'none';
   
-  container.innerHTML = state.history.map((item, index) => {
+  // YouTube отключён: yt-плейлисты в истории не показываем (данные не трогаем,
+  // клик по ним всё равно блокировался бы guard'ом в playStation).
+  const historyItems = YOUTUBE_ENABLED
+    ? state.history
+    : state.history.filter(item => !isYoutubeStation(state.stations.find(s => s.id === item.id) || item));
+  if (historyItems.length === 0) {
+    container.innerHTML = '';
+    if (emptyMsg) emptyMsg.style.display = 'block';
+    return;
+  }
+  
+  container.innerHTML = historyItems.map((item, index) => {
     const station = state.stations.find(s => s.id === item.id) || item;
     const playedDate = new Date(item.playedAt);
     const timeStr = playedDate.toLocaleString('ru-RU', {
@@ -635,6 +679,12 @@ function renderHistory() {
 
 // Инициализация UI
 function initUI() {
+  // YouTube отключён в этом релизе (YOUTUBE_ENABLED): секция добавления
+  // плейлиста скрывается — разметка остаётся, чтобы включить обратно одной
+  // строкой флага без правок вёрстки.
+  const ytSection = document.getElementById('ytPlaylistSection');
+  if (ytSection) ytSection.style.display = YOUTUBE_ENABLED ? '' : 'none';
+
   // Установить начальный объем
   const volumeSlider = document.getElementById('volumeSlider');
   const volumeValue = document.getElementById('volumeValue');
@@ -797,11 +847,16 @@ function renderStations(stations) {
   // YouTube-плейлисты и одиночные видео живут в своём разделе «YouTube»,
   // а не вперемешку с «Другая»: им нечего искать по странам, важен сам
   // плейлист. Раздел — первым в списке, остальные группы как раньше.
-  const isYoutubeStation = station =>
-    station.type === 'youtube-playlist' || (typeof station.id === 'string' && station.id.startsWith('yt-'));
-  const ytStations = filtered.filter(isYoutubeStation);
+  // При отключённом YOUTUBE_ENABLED yt-станции выпадают из списка целиком
+  // (данные в сторе не трогаем — вернутся вместе с флагом).
+  const visible = YOUTUBE_ENABLED ? filtered : filtered.filter(s => !isYoutubeStation(s));
+  if (visible.length === 0) {
+    container.innerHTML = `<p class="empty-message">${t('Станции не найдены')}</p>`;
+    return;
+  }
+  const ytStations = visible.filter(isYoutubeStation);
   const countries = new Map();
-  filtered.filter(s => !isYoutubeStation(s)).forEach(station => countries.set(station.country, [...(countries.get(station.country) || []), station]));
+  visible.filter(s => !isYoutubeStation(s)).forEach(station => countries.set(station.country, [...(countries.get(station.country) || []), station]));
   const groups = [];
   if (ytStations.length) groups.push(['YouTube', ytStations]);
   [...countries]
@@ -877,9 +932,23 @@ function renderFavorites() {
     .map(id => state.stations.find(s => s.id === id))
     .filter(s => s);
   
+  // YouTube отключён: yt-плейлисты в избранном не показываем (сами записи
+  // в сторе остаются — вернутся вместе с флагом YOUTUBE_ENABLED).
+  if (!YOUTUBE_ENABLED) {
+    favoriteStations = favoriteStations.filter(s => !isYoutubeStation(s));
+  }
+  
   // Применить сортировку к избранному
   const sortType = state.settings.sortType || 'name';
   favoriteStations = sortStations(favoriteStations, sortType);
+  
+  // После фильтрации YouTube избранное может оказаться пустым — вернуть
+  // сообщение «Добавьте станции в избранное» вместо голого списка.
+  if (favoriteStations.length === 0) {
+    container.innerHTML = '';
+    emptyMsg.style.display = 'block';
+    return;
+  }
   
   container.innerHTML = favoriteStations.map(station => `
     <div class="station-item ${state.currentStation?.id === station.id && state.isPlaying ? 'playing' : ''}" 
@@ -1026,8 +1095,14 @@ async function playStation(station) {
     return;
   }
 
-  // YouTube-плейлист — очередь треков, у неё свой путь запуска
+  // YouTube-плейлист — очередь треков, у неё свой путь запуска. Опция
+  // временно выключена (YOUTUBE_ENABLED): код сохранён, запуск блокируется
+  // с пояснением — станции из истории/избранного не должны падать молча.
   if (station.type === 'youtube-playlist') {
+    if (!YOUTUBE_ENABLED) {
+      showToast(t('YouTube временно отключён'), 'info');
+      return;
+    }
     return playYoutubeStation(station);
   }
   
@@ -2443,7 +2518,10 @@ async function checkAllStations() {
   button.setAttribute('aria-disabled', 'true');
   status.textContent = t('Проверка…');
   let working = 0;
-  await Promise.all(state.stations.map(async station => {
+  // YouTube отключён: yt-плейлист не поток — проверка только дольше ждала
+  // таймаут на каждый запуск и врала в счётчике «Работают X из Y».
+  const toCheck = YOUTUBE_ENABLED ? state.stations : state.stations.filter(s => !isYoutubeStation(s));
+  await Promise.all(toCheck.map(async station => {
     const result = await window.AppAPI.checkStream(station.url);
     if (result?.success === true) {
       state.stationHealth[station.id] = true;
@@ -2455,7 +2533,7 @@ async function checkAllStations() {
   }));
   await window.AppAPI.saveStations(state.stations);
   renderStations(state.stations);
-  status.textContent = t('Работают {working} из {total}', { working: working, total: state.stations.length });
+  status.textContent = t('Работают {working} из {total}', { working: working, total: toCheck.length });
   button.dataset.busy = 'false';
   button.removeAttribute('aria-disabled');
 }
@@ -3302,6 +3380,36 @@ function initEqualizer() {
       applyAudioProcessingChange();
     };
   }
+
+  // Ползунок усиления нативного вывода (0…+12 дБ). Громкость не трогаем —
+  // это отдельная ручка «тихое радио против горячих потоков»: сильнее +
+  // громче и риск «бочки», слабее — тише и чище. Применяется сразу
+  // (Preamp в хосте), а на браузерном пути усиление не действует.
+  const gainSlider = document.getElementById('gainSlider');
+  const gainValue = document.getElementById('gainValue');
+  const renderGainValue = () => {
+    const db = nativeGainDb();
+    if (gainSlider && document.activeElement !== gainSlider) gainSlider.value = String(db);
+    if (gainValue) gainValue.textContent = (db > 0 ? '+' : '') + db;
+  };
+  if (gainSlider) {
+    renderGainValue();
+    // Хост хранит усиление с самого старта — поле заполнится ещё до первого
+    // запуска станции, чтобы Preamp не «мигал» до первой настройки.
+    applyNativeGain();
+    gainSlider.oninput = () => {
+      const db = Math.min(12, Math.max(0, Math.round(Number(gainSlider.value) || 0)));
+      state.settings.gainDb = db;
+      if (gainValue) gainValue.textContent = (db > 0 ? '+' : '') + db;
+      applyNativeGain();
+      // Отложенное сохранение: ползунок шлёт десятки input в секунду,
+      // saveData() на каждый — та же ловушка, что была у громкости.
+      scheduleGainSave();
+    };
+    gainSlider.onchange = () => {
+      saveData();
+    };
+  }
 }
 
 // Значения для нативного эквалайзера LibVLC: null — снять фильтр совсем
@@ -3315,6 +3423,28 @@ function nativeEqualizerValues() {
   const eq = state.settings.equalizer;
   if (state.ytQueue || !eq?.enabled || !Array.isArray(eq.values) || !eq.values.some(v => v)) return null;
   return eq.values;
+}
+
+// Усиление нативного вывода (ползунок 0…+12 дБ, по умолчанию +6): даёт
+// Preamp эквалайзера LibVLC — отдельный фильтр gain на экземпляре не
+// работает, а SetEqualizer затирает audio-filter. Отдельный мост
+// setNativeGain, а не параметр setNativeEqualizer: сигнатура последнего
+// закреплена тестами, и усиление должно жить независимо от полос —
+// применяется и при выключенном эквалайзере, и при плоских полосах.
+function nativeGainDb() {
+  const db = Number(state.settings.gainDb);
+  return Number.isFinite(db) ? Math.min(12, Math.max(0, db)) : 6;
+}
+
+function applyNativeGain() {
+  try {
+    const pending = window.AppAPI.setNativeGain(nativeGainDb());
+    if (pending && typeof pending.catch === 'function') {
+      pending.catch(e => console.warn('Не удалось применить усиление LibVLC:', e));
+    }
+  } catch (e) {
+    console.warn('Не удалось применить усиление LibVLC:', e);
+  }
 }
 
 // Применить изменение вкл/выкл обработки звука на лету: если элемент уже в графе —
@@ -3585,6 +3715,16 @@ async function addYoutubePlaylist() {
   const button = document.getElementById('addYtPlaylistBtn');
   const messageEl = document.getElementById('ytPlaylistMessage');
   const url = (input?.value || '').trim();
+
+  // Опция выключена: секция скрыта, но на всякий случай блокируем и вызов —
+  // резолв через yt-dlp сейчас всё равно падает с WinError 448.
+  if (!YOUTUBE_ENABLED) {
+    if (messageEl) {
+      messageEl.textContent = t('YouTube временно отключён');
+      messageEl.className = 'message error';
+    }
+    return;
+  }
 
   if (!url) {
     if (messageEl) {
@@ -3900,7 +4040,7 @@ function setupIPCListeners() {
   });
   
   register('onShowAbout', () => {
-    showToast(t('CatLu Radio NET v3.5.6\n\nПриложение для прослушивания интернет-радио.'), 'info');
+    showToast(t('CatLu Radio NET v3.5.7\n\nПриложение для прослушивания интернет-радио.'), 'info');
   });
   
   // При выгрузке страницы помечаем закрытие: stopPlay() в этом случае не

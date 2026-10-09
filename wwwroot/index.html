@@ -10,7 +10,7 @@
     console.log('Время:', new Date().toLocaleTimeString());
   </script>
   <!-- WebView2 API -->
-  <script src="js/api-adapter.js?v=3.5.6"></script>
+  <script src="js/api-adapter.js?v=3.5.7"></script>
   <!-- HLS.js для поддержки HLS потоков (m3u8) -->
   <script src="js/hls.min.js"></script>
 </head>
@@ -178,6 +178,11 @@
             Выравнивание громкости
           </label>
         </div>
+        <div class="form-group" style="display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 12px;">
+          <label for="gainSlider" style="margin-bottom: 0; white-space: nowrap;">Усиление, дБ</label>
+          <input type="range" id="gainSlider" class="gain-slider" min="0" max="12" step="1" value="6" style="flex: 1; min-width: 140px;">
+          <span id="gainValue" class="gain-value">+6</span>
+        </div>
         <div class="equalizer-bands" id="equalizerBands">
           <!-- Полосы эквалайзера будут добавлены динамически -->
         </div>
@@ -319,7 +324,7 @@
           </div>
         </div>
         
-            <div class="settings-section" style="margin-top: 20px;">
+            <div class="settings-section" id="ytPlaylistSection" style="margin-top: 20px;">
               <h3>YouTube-плейлист</h3>
               <p class="settings-description">Добавьте плейлист, видео или YouTube-радио по ссылке — он заиграет очередью в основном плеере, с эквалайзером и историей.</p>
               <div class="form-group">
@@ -563,9 +568,9 @@
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
 
   <!-- Чистка списка станций при старте: отдельный модуль, чтобы тесты могли его проверять -->
-  <script src="js/station-cleanup.js?v=3.5.6"></script>
+  <script src="js/station-cleanup.js?v=3.5.7"></script>
   <!-- Основной скрипт -->
-  <script src="js/renderer.js?v=3.5.6"></script>
+  <script src="js/renderer.js?v=3.5.7"></script>
   <!-- Вкладки внутри настроек: панели вместо аккордеонов -->
   <script>
     // Показать выбранную панель настроек, скрыв остальные

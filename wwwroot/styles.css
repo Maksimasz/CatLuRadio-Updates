@@ -453,6 +453,23 @@ body {
   text-align: right;
 }
 
+/* Ползунок усиления 0…+12 дБ (эквалайзер): горизонтальный, как громкость */
+.gain-slider {
+  accent-color: var(--md-primary);
+  cursor: pointer;
+  height: 20px;
+  background: transparent;
+  outline: none;
+}
+
+.gain-value {
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 #volumeValue {
   min-width: 42px;
   font-size: 12px;

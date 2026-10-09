@@ -119,6 +119,11 @@ namespace CatLuRadio
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardErrorEncoding = Encoding.UTF8,
                 };
+                // UTF-8 на стороне процесса: console-кодировка Windows по
+                // умолчанию (1251) ломает кириллицу в выводе и в WinError-
+                // сообщениях. Дёшево и без обратных эффектов для ASCII.
+                psi.Environment["PYTHONUTF8"] = "1";
+                psi.Environment["PYTHONIOENCODING"] = "utf-8";
                 foreach (var arg in args) psi.ArgumentList.Add(arg);
                 using var process = Process.Start(psi)
                     ?? throw new InvalidOperationException("Не удалось запустить yt-dlp");

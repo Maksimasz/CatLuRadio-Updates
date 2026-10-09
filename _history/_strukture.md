@@ -402,3 +402,22 @@
 - Готовый установщик: `release/CatLuRadio-3.5.6-Standalone-Setup-desktop.exe` (375 226 484 байт, SHA-256 `6C5C8CEC0CD7CB9738D5C5FE24F77B71B0542C1E6C85F2453D3430B782BE3E0B`).
 - Опубликован релиз `v3.5.6`: `https://github.com/Maksimasz/CatLuRadioNET/releases/tag/v3.5.6` (id 407769969); установщик `CatLuRadio-3.5.6-Standalone-Setup-desktop.exe` загружен ассетом (id 624532119, 375 226 484 байт) — `releases/latest` теперь v3.5.6, у установленной 3.5.5 при следующем запуске загорится бейдж «1».
 - Коммит `28aa628` «Релиз 3.5.6» запушен; обычная команда `git push` в этой сессии периодически зависает — надёжно проходит push по прямому URL с кредом из диспетчера учётных данных (blob = токен, пользователь `Maksimasz`).
+
+
+## YouTube выключен флагом, ползунок усиления и пересоздание кеша иконок 2026-10-09 (релиз 3.5.7)
+
+Три обращения после 3.5.6: (1) «отключи пока опцию с ютубом, а то репозиторий открытый а там не работает» (WinError 448 в yt-dlp — причина ещё не разобрана), (2) «радио тихое» — в 3.5.6 убрали общий Preamp +6 дБ, а он и был причиной и «бочки» и громкости, (3) иконки в Проводнике показывают старые — кеш Windows.
+
+### Фиксы
+
+- **YouTube по флагу YOUTUBE_ENABLED = false** (в начале renderer.js — единственный переключатель). Код очереди не тронут: скрывается секция #ytPlaylistSection (разметка и id на месте — включение обратно без правок вёрстки), yt-станции отфильтрованы из списка (группа «YouTube» при выключенном флаге не собирается, но строка groups.push(['YouTube', ytStations] сохранена — якорь youtube-queue), из избранного, истории и фоновой проверки; guard в playStation показывает тост «YouTube временно отключён», addYoutubePlaylist отвечает той же строкой в поле сообщения, автозапуск пропускает yt-станцию молча. Данные плейлистов в store не тронуты, lastStationId не чистится.
+- **Ползунок усиления 0…+12 дБ, по умолчанию +6** (вкладка Эквалайзер, под чекбоксами): state.settings.gainDb (скаляр, слияние с проверкой Number.isFinite), мост setNativeGain отдельно от setNativeEqualizer (его сигнатура закреплена playback-guard/youtube-queue), хост хранит nativeEqValues + nativeGainDb и собирает цепочку общим ApplyEqualizerFilter(): полосы (если включены) + SetPreamp; при нуле усиления и без полос — UnsetEqualizer (чистый проход 3.5.6). Усиление действует и при выключенном эквалайзере — плоский Equalizer с Preamp. Пересборка идёт и из setNativeVolume (повторный SetEqualizer), так что смена громкости не сбивает Preamp. Сохранение через scheduleGainSave (дебаунс 400 мс — тот же приём, что у громкости).
+- **YtDlp.cs**: psi.Environment PYTHONUTF8=1 и PYTHONIOENCODING=utf-8 — кириллица в выводе и WinError-сообщениях не ломается консольной кодировкой.
+- **Переводы EN/LT/HE**: «Усиление, дБ» и «YouTube временно отключён».
+- **Кеш иконок Windows пересоздан**: удалены iconcache_*.db в %LocalAppData% и %LocalAppData%\Microsoft\Windows\Explorer + ie4uinit.exe -show, Проводник перезапущен (согласовано с пользователем).
+
+### Тесты и сборка
+
+- 12/12 node-тестов (новые: gain-slider — цепочка вёрстка→state→мост→Preamp с клампом 0…+12 и чистым проходом; youtube-off — флаг, гейты и якоря без потери кода), README — список из 12.
+- dotnet build -c Debug — 0 ошибок/0 предупреждений; publish win-x64 self-contained (CatLuRadio.exe, yt-dlp.exe, index.html с 3× ?v=3.5.7).
+- Установщик: release/CatLuRadio-3.5.7-Standalone-Setup-desktop.exe (375 360 781 байт, SHA-256 09D31FBE4F831241F6183F444E0FBF0E0E3E8D55348D588A0EB7EFB8BAFBE415).

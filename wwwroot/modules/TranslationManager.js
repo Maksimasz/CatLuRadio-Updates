@@ -98,6 +98,8 @@ const TranslationManager = {
       'Вокал': 'Vocal',
       'Сброс': 'Reset',
       'Выравнивание громкости': 'Loudness leveling',
+      'Усиление, дБ': 'Gain, dB',
+      'YouTube временно отключён': 'YouTube is temporarily disabled',
       'Перетащите ползунки для настройки частот. Изменения применяются автоматически.': 'Drag the sliders to adjust frequencies. Changes apply automatically.',
       'Ошибка создания эквалайзера. Слайдеры не были созданы.': 'Failed to create the equalizer. The sliders were not built.',
       'ОШИБКА: Модуль Equalizer не загружен. Проверьте загрузку modules/Equalizer.js': 'ERROR: Equalizer module not loaded. Check that modules/Equalizer.js is loaded',
@@ -238,7 +240,7 @@ const TranslationManager = {
       'Станция успешно обновлена и сохранена!': 'Station updated and saved successfully!',
       'Вы уверены, что хотите удалить эту станцию?': 'Are you sure you want to delete this station?',
       'Ошибка при удалении станции: {error}': 'Error deleting station: {error}',
-      'CatLu Radio NET v3.5.6\n\nПриложение для прослушивания интернет-радио.': 'CatLu Radio NET v3.5.6\n\nInternet radio player.',
+      'CatLu Radio NET v3.5.7\n\nПриложение для прослушивания интернет-радио.': 'CatLu Radio NET v3.5.7\n\nInternet radio player.',
 
       // ——— Проверка станций и обновления ———
       'Проверка…': 'Checking…',
@@ -394,6 +396,8 @@ const TranslationManager = {
       'Вокал': 'Vokalas',
       'Сброс': 'Atstatyti',
       'Выравнивание громкости': 'Garsumo išlyginimas',
+      'Усиление, дБ': 'Pastiprinimas, dB',
+      'YouTube временно отключён': 'YouTube laikinai išjungtas',
       'Перетащите ползунки для настройки частот. Изменения применяются автоматически.': 'Vilkite slankiklius dažniams reguliuoti. Pakeitimai taikomi automatiškai.',
 
       '⚙️ Основные': '⚙️ Pagrindinės',
@@ -594,6 +598,8 @@ const TranslationManager = {
       'Вокал': 'קולות',
       'Сброс': 'איפוס',
       'Выравнивание громкости': 'יישור עצמה',
+      'Усиление, дБ': 'הגברת עוצמה, דצ״מ',
+      'YouTube временно отключён': 'YouTube מושבת זמנית',
       'Перетащите ползунки для настройки частот. Изменения применяются автоматически.': 'גררו את המחוונים לכוונון תדרים. השינויים מוחלים אוטומטית.',
 
       '⚙️ Основные': '⚙️ כללי',
