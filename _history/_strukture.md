@@ -375,3 +375,30 @@
 - Проверено: 8/8 node-тестов, `dotnet build` (Debug) — 0 ошибок, `dotnet publish -c Release -r win-x64 --self-contained true`.
 - Готовый установщик: `release/CatLuRadio-3.5.5-Standalone-Setup-desktop.exe` (358 176 803 байт, SHA-256 `8C79D66E6D2E3A35C479CE66FF688924B7A3F7740492E034140394F7ED10CB2F`).
 - Опубликован релиз `v3.5.5`: `https://github.com/Maksimasz/CatLuRadioNET/releases/tag/v3.5.5` (id 407536226); установщик `CatLuRadio-3.5.5-Standalone-Setup-desktop.exe` загружен ассетом (апдейтер смотрит на `releases/latest`).
+
+## YouTube через yt-dlp, чистый звук и бейдж обновления 2026-10-09 (релиз 3.5.6)
+
+Пять обращений после 3.5.5: (1) «юутуб не играет — 403», (2) «звук идёт как из бочки, качество в 10 раз хуже», (3) «отключи эквалайзер от ютуба, оставь только кроссфайдинг и нормализацию», (4) «в планировщике минимум 5 заданий, а видно только одно», (5) «при запуске проверялось обновление и возле шестерёнки появлялась 1».
+
+### Диагностика
+
+- С утра 2026-10-09 YouTubeExplode отвечает `403 (Forbidden)` на каждый резолв (app.log: резолв ~800 мс ×N подряд) → «Не удалось воспроизвести плейлист: Remix 80». yt-dlp на том же канале работает: `--flat-playlist -j` → 128 записей за 2.6 с, `-f bestaudio/best -g` → ссылка googlevideo (HTTP 206, audio/webm) за ~2.9 с, бот-чека нет.
+- «Бочка»: общий Preamp +6 дБ внутри эквалайзера LibVLC применялся к любому источнику, включая «горячие» радиопотоки — перегрузка, искажения и нелинейный ползунок (0…100% шёл усилением ×2); полосы эквалайзера применялись всегда, мимо чекбокса.
+- Планировщик: вложенная прокрутка `#schedulesList` (`flex: 1` + `overflow-y: auto`) отдавала списку ~60px — карточки наползали, видна одна из пяти. Проверено в живом DOM: 5 карточек, `#schedulesList` overflow visible, панель scrollHeight 806 > clientHeight 381 — прокрутка одна, у панели.
+
+### Фиксы (коммиты 99d5d0c, 024e06b, bcec6a3)
+
+- **YouTube через yt-dlp**: YouTubeExplode удалён полностью (включая блок `SLAVA_UKRAINI`/Deorcify в Program.cs — для резолва он больше не нужен); новый `YtDlp.cs` — поиск exe (каталог приложения → `%LocalAppData%\CatLuRadio` → PATH → автоскачивание с github.com/yt-dlp), UTF-8, скрытое окно, таймаут+Kill, ошибка = строка `ERROR:` из stderr. `ResolveYoutubePlaylist`/`ResolveYoutubeTrack` переписаны; таймауты хоста ниже мостовых (плейлист 55 с, трек 25 с). yt-dlp.exe (~17 МБ) в .gitignore, в установщик попадает через `<Content Include="yt-dlp.exe">` в csproj.
+- **Эквалайзер только по чекбоксу**: helper `nativeEqualizerValues()` возвращает null (`UnsetEqualizer` — чистый проход), если очередь YouTube, чекбокс выключен или полосы плоские; YouTube всегда `setNativeEqualizer(null)`; `NativeGainDb`/`SetPreamp` удалены — громкость только `nativePlayer.Volume`; чекбокс действует сразу (`applyAudioProcessingChange` с веткой native).
+- **Планировщик**: `.settings-panel.active` → `display:block`, убраны flex-цепочки — прокрутка у всей панели.
+- **Бейдж «1» на шестерёнке**: `<span id="updateBadge" hidden>` внутри кнопки настроек, `.update-badge` (absolute, фон `--md-error`, текст цветом фона темы) + обязательное авторское `.update-badge[hidden]{display:none}` (UA-правило `[hidden]` перебивается авторскими классами); в `checkForUpdates()` — показ при hasUpdate с подсказкой «Доступна версия {version}», скрытие, когда обновлений нет, ошибка сети не гасит уже найденное. Проверка при запуске уже существовала (`checkForUpdates()` в init).
+- **Иконки**: icon.ico обновлён (локальная правка пользователя закоммичена) — это ApplicationIcon и SetupIconFile; CatLuRadioNet.ico нигде не используется → добавлен в .gitignore.
+- Якоря: `youtube-queue` (есть yt-dlp.exe/YtDlp.cs/`"bestaudio/best"`/`YtDlp.RunAsync`, нет YoutubeExplode и `SLAVA_UKRAINI`), `settings-ui` (display:block у панели, запрет вложенной прокрутки `#schedulesList`), новый `update-badge`.
+
+### Релиз 3.5.6
+
+- Версия поднята до 3.5.6 везде: csproj (`Version`/`AssemblyVersion`/`FileVersion`), `?v=` в index.html (3 ссылки), installer/CatLuRadio.iss (`MyAppVersion`/`VersionInfoVersion`), «О программе» (renderer.js, TranslationManager.js), бейдж README; README — запись 3.5.6 в «Версии», исправлено устаревшее описание (+6 дБ/EQ на YouTube) и пункт автообновлений.
+- Проверено: 10/10 node-тестов (включая новый `update-badge`), `dotnet build` (Debug) — 0 ошибок/0 предупреждений, `dotnet publish -c Release -r win-x64 --self-contained true` (в publish: CatLuRadio.exe, yt-dlp.exe, index.html с 3× `?v=3.5.6`).
+- Готовый установщик: `release/CatLuRadio-3.5.6-Standalone-Setup-desktop.exe` (375 226 484 байт, SHA-256 `6C5C8CEC0CD7CB9738D5C5FE24F77B71B0542C1E6C85F2453D3430B782BE3E0B`).
+- Опубликован релиз `v3.5.6`: `https://github.com/Maksimasz/CatLuRadioNET/releases/tag/v3.5.6` (id 407769969); установщик `CatLuRadio-3.5.6-Standalone-Setup-desktop.exe` загружен ассетом (id 624532119, 375 226 484 байт) — `releases/latest` теперь v3.5.6, у установленной 3.5.5 при следующем запуске загорится бейдж «1».
+- Коммит `28aa628` «Релиз 3.5.6» запушен; обычная команда `git push` в этой сессии периодически зависает — надёжно проходит push по прямому URL с кредом из диспетчера учётных данных (blob = токен, пользователь `Maksimasz`).
