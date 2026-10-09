@@ -113,6 +113,7 @@ node tests\api-adapter-timeout.test.js     # таймауты моста WebView
 node tests\youtube-queue.test.js           # YouTube-плейлисты: резолвер, nativeEnded, очередь
 node tests\stations-persistence.test.js   # сохранённые станции переживают перезапуск
 node tests\youtube-seek.test.js           # перемотка YouTube и дебаунс сохранения громкости
+node tests\update-badge.test.js           # бейдж обновления на шестерёнке настроек
 ```
 
 ## 🗂 Структура проекта

@@ -542,6 +542,34 @@ body {
   display: block;
 }
 
+/* Бейдж «есть обновление» на шестерёнке (просьба 2026-10-09): checkForUpdates()
+   снимает hidden, пока GitHub отдаёт версию новее установленной. Кнопка
+   position: relative (см. .tab-btn), у .tab-btn-icon overflow: visible — бейдж
+   не обрезается. Текст цветом фона: так он встречный к цвету ошибки темы
+   (в светлой теме ошибка тёмная — белый текст; в тёмной светлая — тёмный). */
+.update-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--md-error);
+  color: var(--md-background);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* Авторское правило обязательно: правило [hidden] из UA-стилей проигрывает
+   любым авторским классам, и без него бейдж показывался бы всегда. */
+.update-badge[hidden] {
+  display: none;
+}
+
 /* Режим настроек: в строке вкладок остаётся только шестерёнка/крестик —
    без дубля меню; крестик закрывает настройки и возвращает к плееру. */
 .tab-btn-icon .close-icon {

@@ -2466,6 +2466,7 @@ async function checkForUpdates() {
   const status = document.getElementById('updateStatus');
   const install = document.getElementById('installUpdateBtn');
   const button = document.getElementById('checkUpdateBtn');
+  const badge = document.getElementById('updateBadge');
   // Повторный клик во время уже идущей проверки не нужен.
   if (!status || !install || checkingUpdate) return;
   checkingUpdate = true;
@@ -2496,10 +2497,20 @@ async function checkForUpdates() {
     return;
   }
   if (!result.hasUpdate || !result.url) {
+    // Обновлений нет — бейдж гасим (в т.ч. если в этой же сессии он уже
+    // успел загореться, а релиз тем временем сняли/переименовали).
+    if (badge) badge.hidden = true;
     status.textContent = t('Установлена последняя версия.') + stamp;
     return;
   }
   availableUpdate = result;
+  // Бейдж на шестерёнке (просьба 2026-10-09): обновление заметно, пока
+  // настройки закрыты. Ошибку сети выше не трогаем — версия, найденная
+  // раньше, не должна исчезать из-за офлайна.
+  if (badge) {
+    badge.hidden = false;
+    badge.title = t('Доступна версия {version}.', { version: result.version });
+  }
   status.textContent = t('Доступна версия {version}.', { version: result.version }) + stamp;
   install.textContent = t('Обновить до {version}', { version: result.version });
   install.style.display = 'inline-block';
